@@ -1,8 +1,20 @@
 /*
-OpenGL Utilities Library written by Isak Horvath in 2024
 
-Inspired by Ingemar Ragnemalm
-(examiner of university computer graphics course TSKB07)
+GLUtilities: An OpenGL Utility Library
+--------------------------------------
+
+Author: Isak Horvath
+Year:   2024
+
+OVERVIEW:
+GLUtilities is a comprehensive utility library designed for OpenGL applications. 
+It leverages the functionalities provided by the GLUT/FreeGLUT library, 
+offering an extended set of tools for developers working with OpenGL.
+
+INSPIRATION:
+This project draws inspiration from the work of Ingemar Ragnemalm,
+author of MicroGLUT and examiner for university computer graphics course TSKB07. 
+
 */
 
 #ifndef _GLUTILITIES_
@@ -26,22 +38,22 @@ void glutilities_main();
 
 void glutilities_check();
 
+void glutilities_reshape_func(void (*func)(int w, int h));
 void glutilities_display_mode(unsigned int m);
-void glutilities_display(void (*func)(void));
+void glutilities_display_func(void (*func)(void));
 void glutilities_swap_buffers();
 void glutilities_redisplay();
-void glutilities_reshape();
 
-void glutilities_key_up_event_func(void (*func)(unsigned char key, int x, int y));
-void glutilities_key_event_func(void (*func)(unsigned char key, int x, int y));
+void glutilities_key_up_event_func(void (*func)(unsigned char k, int x, int y));
+void glutilities_key_event_func(void (*func)(unsigned char k, int x, int y));
 char glutilities_key_is_down(unsigned char c);
 
-void glutilities_mod_up_event_func(void (*func)(unsigned char key, int x, int y));
-void glutilities_mod_event_func(void (*func)(unsigned char key, int x, int y));
+void glutilities_mod_up_event_func(void (*func)(unsigned char k, int x, int y));
+void glutilities_mod_event_func(void (*func)(unsigned char k, int x, int y));
 
 void glutilities_passive_mouse_move_func(void (*func)(int x, int y));
 void glutilities_mouse_move_func(void (*func)(int x, int y));
-void glutilities_mouse_func(void (*func)(int button, int state, int x, int y));
+void glutilities_mouse_func(void (*func)(int b, int s, int x, int y));
 char glutilities_mouse_is_down(unsigned char c);
 
 void glutilities_show_cursor();
