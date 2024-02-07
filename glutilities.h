@@ -20,57 +20,65 @@ author of MicroGLUT and examiner for university computer graphics course TSKB07.
 #ifndef _GLUTILITIES_
 #define _GLUTILITIES_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "constants.h"
 
-void glutilities_context_version(int major, int minor);
+void glUtilitiesContextVersion(int major, int minor);
 
-void glutilities_reshape_window(int w, int h);
-void glutilities_create_window(const char *t);
+void glUtilitiesReshapeWindow(int w, int h);
+void glUtilitiesCreateWindow(const char *t);
 
-void glutilities_set_window_pos(int x, int y);
-void glutilities_set_window_title(char *t);
+void glUtilitiesSetWindowPos(int x, int y);
+void glUtilitiesSetWindowTitle(char *t);
 
-void glutilities_window_size(int w, int h);
-void glutilities_window_pos(int x, int y);
+void glUtilitiesWindowSize(int w, int h);
+void glUtilitiesWindowPos(int x, int y);
 
-void glutilities_init(int *argcp, char **argv);
-void glutilities_main();
+void glUtilitiesInit(int *argcp, char **argv);
+void glUtilitiesMain();
 
-void glutilities_check();
+void glUtilitiesCheck();
 
-void glutilities_reshape_func(void (*func)(int w, int h));
-void glutilities_display_mode(unsigned int m);
-void glutilities_display_func(void (*func)(void));
-void glutilities_swap_buffers();
-void glutilities_redisplay();
+void glUtilitiesReshapeFunc(void (*func)(int w, int h));
+void glUtilitiesDisplayMode(unsigned int m);
+void glUtilitiesDisplayFunc(void (*func)(void));
+void glUtilitiesSwapBuffers();
+void glUtilitiesRedisplay();
 
-void glutilities_key_up_event_func(void (*func)(unsigned char k, int x, int y));
-void glutilities_key_event_func(void (*func)(unsigned char k, int x, int y));
-char glutilities_key_is_down(unsigned char c);
+void glUtilitiesKeyUpEventFunc(void (*func)(unsigned char k, int x, int y));
+void glUtilitiesKeyEventFunc(void (*func)(unsigned char k, int x, int y));
+char glUtilitiesKeyIsDown(unsigned char c);
 
-void glutilities_mod_up_event_func(void (*func)(unsigned char k, int x, int y));
-void glutilities_mod_event_func(void (*func)(unsigned char k, int x, int y));
+void glUtilitiesModUpEventFunc(void (*func)(unsigned char k, int x, int y));
+void glUtilitiesModEventFunc(void (*func)(unsigned char k, int x, int y));
 
-void glutilities_passive_mouse_move_func(void (*func)(int x, int y));
-void glutilities_mouse_move_func(void (*func)(int x, int y));
-void glutilities_mouse_func(void (*func)(int b, int s, int x, int y));
-char glutilities_mouse_is_down(unsigned char c);
+void glUtilitiesPassiveMouseMoveFunc(void (*func)(int x, int y));
+void glUtilitiesMouseMoveFunc(void (*func)(int x, int y));
+void glUtilitiesMouseFunc(void (*func)(int b, int s, int x, int y));
+char glUtilitiesMouseIsDown(unsigned char c);
 
-void glutilities_show_cursor();
-void glutilities_hide_cursor();
+void glUtilitiesShowCursor();
+void glUtilitiesHideCursor();
 
-int  glutilities_get(int t);
+int  glUtilitiesGet(int t);
 
-void glutilities_idle_func(void (*func)(void));
+void glUtilitiesIdleFunc(void (*func)(void));
 
-void glutilities_timer_func(int ms, void (*func)(int arg), int arg);
-void glutilities_repeating_timer_func(int ms);
+void glUtilitiesTimerFunc(int ms, void (*func)(int arg), int arg);
+void glUtilitiesRepeatingTimerFunc(int ms);
 
-void glutilities_warp_pointer(int x, int y);
+void glUtilitiesWarpPointer(int x, int y);
 
-void glutilities_toggle_fullscreen();
-void glutilities_exit_fullscreen();
-void glutilities_fullscreen();
-void glutilities_exit();
+void glUtilitiesToggleFullscreen();
+void glUtilitiesExitFullscreen();
+void glUtilitiesFullscreen();
+void glUtilitiesExit();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

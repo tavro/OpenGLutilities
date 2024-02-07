@@ -57,21 +57,21 @@ struct timeval TIME;
 
 int DISPLAY_MODE;
 
-void glutilities_init(int *argc, char *argv[]) {
+void glUtilitiesInit(int *argc, char *argv[]) {
     gettimeofofday(&TIME, NULL);
     memset(KEYMAP, 0, sizeof(KEYMAP));
 }
 
-void glutilities_display_mode(unsigned int m) {
+void glUtilitiesDisplayMode(unsigned int m) {
     DISPLAY_MODE = m;
 }
 
-void glutilities_window_size(int w, int h) {
+void glUtilitiesWindowSize(int w, int h) {
     WINDOW_WIDTH = w;
     WINDOW_HEIGHT = h;
 }
 
-void glutilities_window_pos(int x, int y) {
+void glUtilitiesWindowPos(int x, int y) {
     WINDOW_POS_X = x;
     WINDOW_POS_Y = y;
 }
@@ -80,7 +80,7 @@ static void create_window(Display *d, const char *n, int x, int y, int w, int h,
     // TODO: Implement
 }
 
-void glutilities_create_window(const char *t) {
+void glUtilitiesCreateWindow(const char *t) {
     DISPLAY = XOpenDisplay(NULL);
     if(!DISPLAY) {
         printf("CREATE_WINDOW ERROR: Could not open display %s\n", t);
@@ -116,43 +116,43 @@ void (*mousemoved)(int x, int y);
 
 int LAST_MOUSE_POS_X, LAST_MOUSE_POS_Y;
 
-void glutilities_reshape_func(void (*func)(int w, int h)) {
+void glUtilitiesReshapeFunc(void (*func)(int w, int h)) {
     reshape = func;
 }
 
-void glutilities_display_func(void (*func)(void)) {
+void glUtilitiesDisplayFunc(void (*func)(void)) {
     display = func;
 }
 
-void glutilities_idle_func(void (*func)(void)) {
+void glUtilitiesIdleFunc(void (*func)(void)) {
     idle = func;
 }
 
-void glutilities_key_up_event_func(void (*func)(unsigned char k, int x, int y)) {
+void glUtilitiesKeyUpEventFunc(void (*func)(unsigned char k, int x, int y)) {
     keyup = func;
 }
 
-void glutilities_key_event_func(void (*func)(unsigned char k, int x, int y)) {
+void glUtilitiesKeyEventFunc(void (*func)(unsigned char k, int x, int y)) {
     key = func;
 }
 
-void glutilities_mod_up_event_func(void (*func)(unsigned char k, int x, int y)) {
+void glUtilitiesModUpEventFunc(void (*func)(unsigned char k, int x, int y)) {
     modkeyup = func;
 }
 
-void glutilities_mod_event_func(void (*func)(unsigned char k, int x, int y)) {
+void glUtilitiesModEventFunc(void (*func)(unsigned char k, int x, int y)) {
     modkey = func;
 }
 
-void glutilities_mouse_func(void (*func)(int b, int b, int x, int y)) {
+void glUtilitiesMouseFunc(void (*func)(int b, int b, int x, int y)) {
     mouse = func;
 }
 
-void glutilities_passive_mouse_move_func(void (*func)(int x, int y)) {
+void glUtilitiesPassiveMouseMoveFunc(void (*func)(int x, int y)) {
     mousemoved = func;
 }
 
-void glutilities_mouse_move_func(void (*func)(int x, int y)) {
+void glUtilitiesMouseMoveFunc(void (*func)(int x, int y)) {
     mousedragged = func;
 }
 
@@ -163,27 +163,27 @@ void handle_key_event() {
 }
 
 void timer(int x) {
-    glutilities_redisplay();
+    glUtilitiesRedisplay();
 }
 
-void glutilities_main() {
+void glUtilitiesMain() {
     char pressed = 0;
     int i;
 
     XAllowEvents(DISPLAY, AsyncBoth, CurrentTime);
 
-    glutilities_timer_func(100, timer, 0);
+    glUtilitiesTimerFunc(100, timer, 0);
 
     while(RUNNING) {
         // TODO: Implement
     }
 }
 
-void glutilities_redisplay() {
+void glUtilitiesRedisplay() {
     ANIMATE = 1;
 }
 
-int glutilities_get(int t) {
+int glUtilitiesGet(int t) {
     struct timeval tv;
 
     switch(t) {
@@ -195,12 +195,12 @@ int glutilities_get(int t) {
 
 // TODO: Implement timers
 
-void glutilities_context_version(int major, int minor) {
+void glUtilitiesContextVersion(int major, int minor) {
     CONTEXT_VERSION_MAJOR = major;
     CONTEXT_VERSION_MINOR = minor;
 }
 
-void glutilities_warp_pointer(int x, int y) {
+void glUtilitiesWarpPointer(int x, int y) {
     if(!DISPLAY) {
         fprintf(stderr, "WARP_POINTER FAILED: Glutilities not initialized!\n");
         return;
@@ -221,11 +221,11 @@ void glutilities_warp_pointer(int x, int y) {
     XFlush(DISPLAY);
 }
 
-void glutilities_show_cursor() {
+void glUtilitiesShowCursor() {
     XUndefineCursor(DISPLAY, WINDOW);
 }
 
-void glutilities_hide_cursor() {
+void glUtilitiesHideCursor() {
     if(!DISPLAY) {
 	    printf("HIDE_CURSOR ERROR: Glutilities not initialized!\n");
         return;
@@ -241,19 +241,19 @@ void glutilities_hide_cursor() {
     XFreePixmap(DISPLAY, pixmap);
 }
 
-char glutilities_key_is_down(unsigned char c) {
+char glUtilitiesKeyIsDown(unsigned char c) {
     return BUTTON_PRESSED[(unsigned int)c];
 }
 
-void glutilities_reshape_window(int w, int h) {
+void glUtilitiesReshapeWindow(int w, int h) {
     XResizeWindow(DISPLAY, WINDOW, w, h);
 }
 
-void glutilities_set_window_pos(int x, int y) {
+void glUtilitiesSetWindowPos(int x, int y) {
     XMoveWindow(DISPLAY, WINDOW, x, y);
 }
 
-void glutilities_set_window_title(char *t) {
+void glUtilitiesSetTindowTitle(char *t) {
     XStoreName(DISPLAY, WINDOW, t);
 }
 
@@ -265,12 +265,12 @@ unsigned int SAVED_WIDTH;
 int SAVED_X;
 int SAVED_Y;
 
-void glutilities_exit_fullscreen() {
+void glUtilitiesExitFullscreen() {
     FULLSCREEN = 0;
     XMoveResizeWindow(DISPLAY, WINDOW, SAVED_X, SAVED_Y, SAVED_WIDTH, SAVED_HEIGHT);
 }
 
-void glutilities_fullscreen() {
+void glUtilitiesFullscreen() {
     FULLSCREEN = 1;
 
     Drawable drawable;
@@ -286,15 +286,15 @@ void glutilities_fullscreen() {
     XMoveResizeWindow(DISPLAY, WINDOW, 0, 0, w, h);
 }
 
-void glutilities_toggle_fullscreen() {
+void glUtilitiesToggleFullscreen() {
     if(FULLSCREEN) {
-        glutilities_exit_fullscreen();
+        glUtilitiesExitFullscreen();
     }
     else  {
-        glutilities_fullscreen();
+        glUtilitiesFullscreen();
     }
 }
 
-void glutilities_exit() {
+void glUtilitiesExit() {
     RUNNING = 0;
 }
