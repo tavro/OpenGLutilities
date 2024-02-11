@@ -55,10 +55,12 @@ static char ANIMATE = 1;
 
 struct timeval TIME;
 
+static Atom wmDeleteMessage;
+
 int DISPLAY_MODE;
 
 void glUtilitiesInit(int *argc, char *argv[]) {
-    gettimeofofday(&TIME, NULL);
+    gettimeofday(&TIME, NULL);
     memset(KEYMAP, 0, sizeof(KEYMAP));
 }
 
@@ -224,7 +226,8 @@ static void create_window(Display *d, const char *n, int x, int y, int w, int h,
     hints.height = h;
     hints.flags = USSize | USPosition;
 
-    XSetNormalHints(d, window, n, n, None, (char **)NULL, 0, &hints);
+    XSetNormalHints(d, window, &hints);
+    XSetStandardProperties(d, window, n, n, None, (char **)NULL, 0, &hints);
 
     if(!context) {
         printf("CREATE_WINDOW ERROR: Could not create context\n");
@@ -299,7 +302,7 @@ void glUtilitiesModEventFunc(void (*func)(unsigned char k, int x, int y)) {
     modkey = func;
 }
 
-void glUtilitiesMouseFunc(void (*func)(int b, int b, int x, int y)) {
+void glUtilitiesMouseFunc(void (*func)(int b, int s, int x, int y)) {
     mouse = func;
 }
 
@@ -544,8 +547,8 @@ int glUtilitiesGet(int t) {
 
     switch(t) {
         case ELAPSED_TIME:
-            gettimeofofday(&tv, NULL);
-            return (tv.tv_usec - timeStart.tv_usec) / 1000 + (tv.tv_sec - timeStart.tv_sec) * 1000;
+            gettimeofday(&tv, NULL);
+            return (tv.tv_usec - TIME.tv_usec) / 1000 + (tv.tv_sec - TIME.tv_sec) * 1000;
         case WIN_WIDTH:
             return WINDOW_WIDTH;
         case WIN_HEIGHT:
@@ -562,13 +565,13 @@ int glUtilitiesGet(int t) {
 typedef struct Timer {
     int arg;
     int time;
-    int reapeatTime;
+    int repeatTime;
     void (*func)(int arg);
     char repeating;
     struct Timer *next;
     struct Timer *prev;
 } Timer;
-Timer timers = NULL;
+Timer *timers = NULL;
 
 void glUtilitiesTimerFunc(int ms, void (*func)(int arg), int arg) {
     Timer *t = (Timer*)malloc(sizeof(Timer));
