@@ -321,7 +321,80 @@ void handle_key_event(XEvent e, void (*proc)(unsigned char k, int x, int y), voi
 
     char raw = buffer[0];
     switch(code) {
-        // TODO: Implement
+        case 80:
+        case 111:
+            buffer[0] = KEY_UP;
+            break;
+        case 85:
+        case 114:
+            buffer[0] = KEY_RIGHT;
+            break;
+        case 88:
+        case 116:
+            buffer[0] = KEY_DOWN;
+            break;
+        case 83:
+        case 113:
+            buffer[0] = KEY_LEFT;
+            break;
+        case 67:
+            buffer[0] = KEY_F1;
+            break;
+        case 68:
+            buffer[0] = KEY_F2;
+            break;
+        case 69:
+            buffer[0] = KEY_F3;
+            break;
+        case 70:
+            buffer[0] = KEY_F4;
+            break;
+        case 71:
+            buffer[0] = KEY_F5;
+            break;
+        case 72:
+            buffer[0] = KEY_F6;
+            break;
+        case 73:
+            buffer[0] = KEY_F7;
+            break;
+        case 81:
+        case 112:
+            buffer[0] = KEY_PAGE_UP;
+            break;
+        case 89:
+        case 117:
+            buffer[0] = KEY_PAGE_DOWN;
+            break;
+        case 79:
+        case 110:
+            buffer[0] = KEY_HOME;
+            break;
+        case 87:
+        case 115:
+            buffer[0] = KEY_END;
+            break;
+        case 90:
+        case 118:
+            buffer[0] = KEY_INSERT;
+            break;
+        case 50:
+            buffer[0] = MOD_KEY_LEFT_SHIFT;
+            break;
+        case 62:
+            buffer[0] = MOD_KEY_RIGHT_SHIFT;
+            break;
+        case 37:
+        case 105:
+            buffer[0] = MOD_KEY_CONTROL;
+            break;
+        case 64:
+        case 108:
+            buffer[0] = MOD_KEY_ALT;
+            break;
+        case 82:
+            buffer[0] = 127;
+            break;
     }
 
     if(raw == 0) {
@@ -355,8 +428,110 @@ void glUtilitiesMain() {
     glUtilitiesTimerFunc(100, timer, 0);
 
     while(RUNNING) {
-        // TODO: Implement
+        while(XPending(DISPLAY) > 0) {
+            XEvent e;
+            XNextEvent(DISPLAY, &e);
+
+            switch(e.type) {
+                case ClientMessage:
+                    if(e.xclient.data.l[0] == wmDeleteMessage) {
+                        RUNNING = 0;
+                    }
+                    break;
+                case Expose:
+                    break;
+                case ConfigureNotify:
+                    if(reshape) {
+                        reshape(e.xconfigure.width, e.xconfigure.height);
+                    }
+                    else {
+                        glViewport(0, 0, e.xconfigure.width, e.xconfigure.height);
+                    }
+                    ANIMATE = 1;
+                    WINDOW_WIDTH = e.xconfigure.width;
+                    WINDOW_HEIGHT = e.xconfigure.height;
+                    break;
+                case KeyPress:
+                    handle_key_event(e, key, modkey, 1);
+                    break;
+                case KeyRelease:
+                    handle_key_event(e, keyup, modkeyup, 0);
+                    break;
+                case ButtonPress:
+                    BUTTON_PRESSED[e.xbutton.button] = 1;
+                    if(mouse) {
+                        switch(e.xbutton.button) {
+                            case Button1:
+                                mouse(MOUSE_LEFT, MOUSE_DOWN, e.xbutton.x, e.xbutton.y);
+                                break;
+                            case Button2:
+                                mouse(MOUSE_MIDDLE, MOUSE_DOWN, e.xbutton.x, e.xbutton.y);
+                                break;
+                            case Button3:
+                                mouse(MOUSE_RIGHT, MOUSE_DOWN, e.xbutton.x, e.xbutton.y);
+                                break;
+                        }
+                    }
+                    break;
+                case ButtonRelease:
+                    BUTTON_PRESSED[e.xbutton.button] = 0;
+                    if(mouse) {
+                        switch(e.xbutton.button) {
+                            case Button1:
+                                mouse(MOUSE_LEFT, MOUSE_UP, e.xbutton.x, e.xbutton.y);
+                                break;
+                            case Button2:
+                                mouse(MOUSE_MIDDLE, MOUSE_UP, e.xbutton.x, e.xbutton.y);
+                                break;
+                            case Button3:
+                                mouse(MOUSE_RIGHT, MOUSE_UP, e.xbutton.x, e.xbutton.y);
+                                break;
+                        }
+                    }
+                    break;
+                case MotionNotify:
+                    pressed = 0;
+                    for(i = 0; i < 5; i++) {
+                        if(BUTTON_PRESSED[i]) {
+                            pressed = 1;
+                        }
+                    }
+
+                    LAST_MOUSE_POS_X = e.xbutton.x;
+                    LAST_MOUSE_POS_Y = e.xbutton.y;
+                    
+                    if(pressed && mousedragged) {
+                        mousedragged(e.xbutton.x, e.xbutton.y);
+                    }
+                    else if(mousemoved) {
+                        mousemoved(e.xbutton.x, e.xbutton.y);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if(ANIMATE) {
+            ANIMATE = 0;
+            if(display) {
+                display();
+            }
+            else {
+                printf("MAIN WARNING: No display function!\n");
+            }
+        }
+        else if(idle) {
+            idle();
+        }
+
+        // TODO: (Implement and) Check timers
     }
+
+    glXMakeCurrent(DISPLAY, None, NULL);
+    glXDestroyContext(DISPLAY, CONTEXT);
+    XDestroyWindow(DISPLAY, WINDOW);
+    XCloseDisplay(DISPLAY);
 }
 
 void glUtilitiesRedisplay() {
