@@ -77,7 +77,162 @@ void glUtilitiesWindowPos(int x, int y) {
 }
 
 static void create_window(Display *d, const char *n, int x, int y, int w, int h, Window *win, GLXContext *ctx) {
-    // TODO: Implement
+    XSetWindowAttributes attributes;
+    XVisualInfo *info;
+
+    GLXContext context;
+    Window window;
+
+    unsigned long mask;
+    int screen = DefaultScreen(d);
+    Window root = RootWindow(d, screen);
+
+    if(CONTEXT_VERSION_MAJOR > 2) {
+		typedef GLXContext (*glXCreateContextAttribsARBProc)(Display*, GLXFBConfig, GLXContext, Bool, const int*);
+		glXCreateContextAttribsARBProc glXCreateContextAttribsARB = 0;
+        
+        if(strstr(glXQueryExtensionsString(d, screen), "GLX_ARB_create_context") != 0) {
+		    glXCreateContextAttribsARB = (glXCreateContextAttribsARBProc)glXGetProcAddress((const GLubyte *)"glXCreateContextAttribsARB");
+        }
+
+        if(!glXCreateContextAttribsARB) {
+            printf("CREATE_WINDOW WARNING: Could not create GL context!\n");
+        }
+
+        int elements;
+        GLXFBConfig *config;
+
+        int attr[] = {
+            GLX_RENDER_TYPE,
+            GLX_RGBA_BIT,
+            GLX_DRAWABLE_TYPE,
+            GLX_WINDOW_BIT,
+            GLX_RED_SIZE, 1,
+            GLX_GREEN_SIZE, 1,
+            GLX_BLUE_SIZE, 1,
+            GLX_ALPHA_SIZE, 1,
+            None, None, None, None, 
+            None, None, None, None, 
+            None, None, None, None,
+            None, None, None, None
+        };
+
+        int i = 12;
+        if(DISPLAY_MODE & DOUBLE) {
+            attr[i++] = GLX_DOUBLEBUFFER;
+            attr[i++] = 1;
+        }
+
+        if(DISPLAY_MODE & DEPTH) {
+            attr[i++] = GLX_DEPTH_SIZE;
+            attr[i++] = 1;
+        }
+
+        if(DISPLAY_MODE & STENCIL) {
+			attr[i++] = GLX_STENCIL_SIZE;
+            attr[i++] = 8;
+        }
+
+        if(DISPLAY_MODE & MULTISAMPLE) {
+			attr[i++] = GLX_SAMPLE_BUFFERS;
+			attr[i++] = 1;
+			attr[i++] = GLX_SAMPLES;
+			attr[i++] = 4;
+        }
+
+        config = glXChooseFBConfig(d, screen, attr, &elements);
+        if(!config) {
+            config = glXChooseFBConfig(d, screen, NULL, &elements);
+            if(!config) {
+                printf("CREATE_WINDOW WARNING: Could not get FB configurations!\n");
+            }
+        }
+
+        int gl3attr[] = {
+            GLX_CONTEXT_MAJOR_VERSION_ARB, CONTEXT_VERSION_MAJOR,
+            GLX_CONTEXT_MINOR_VERSION_ARB, CONTEXT_VERSION_MINOR,
+            GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_DEBUG_BIT_ARB,
+            GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+            None
+        };
+
+        context = glXCreateContextAttribsARB(d, config[0], NULL, 1, gl3attr);
+        if(!context) {
+            printf("CREATE_WINDOW WARNING: No context!\n");
+        }
+
+        info = glXGetVisualFromFBConfig(d, config[0]);
+        if(!info) {
+            printf("CREATE_WINDOW ERROR: Could not create OpenGL window with given pixel format!\n");
+        }
+    }
+    else {
+        int attr[] = {
+            GLX_RGBA,
+            GLX_RED_SIZE, 1,
+            GLX_GREEN_SIZE, 1,
+            GLX_BLUE_SIZE, 1,
+            None, None, None, None, 
+            None, None, None, None, 
+            None, None, None, None,
+            None, None, None, None
+        };
+
+        int i = 7;
+        if(DISPLAY_MODE & DOUBLE) {
+            attr[i++] = GLX_DOUBLEBUFFER;
+        }
+
+        if(DISPLAY_MODE & DEPTH) {
+            attr[i++] = GLX_DEPTH_SIZE;
+            attr[i++] = 1;
+        }
+
+        if(DISPLAY_MODE & STENCIL) {
+            attr[i++] = GLX_STENCIL_SIZE;
+            attr[i++] = 8;
+        }
+
+        info = glXChooseVisual(d, screen, attr);
+        if(!info) {
+            printf("CREATE_WINDOW ERROR: Could not get visual\n");
+            exit(1);
+        }
+
+        context = glXCreateContext(d, info, 0, True);
+        if(!context) {
+            printf("CREATE_WINDOW WARNING: No context!\n");
+        }
+    }
+
+    attributes.event_mask = StructureNotifyMask | ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPress | ButtonReleaseMask | Button1MotionMask | PointerMotionMask;
+    attributes.override_redirect = 0;
+    attributes.background_pixel = 0;
+    attributes.border_pixel = 0;
+    attributes.colormap = XCreateColormap(d, root, info->visual, AllocNone);
+
+    mask = CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect;
+    window = XCreateWindow(d, root, x, y, w, h, 0, info->depth, InputOutput, info->visual, mask, &attributes);
+
+    wmDeleteMessage = XInternAtom(d, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(d, window, &wmDeleteMessage, 1);
+
+    XSizeHints hints;
+    hints.x = x;
+    hints.y = y;
+    hints.width = w;
+    hints.height = h;
+    hints.flags = USSize | USPosition;
+
+    XSetNormalHints(d, window, n, n, None, (char **)NULL, 0, &hints);
+
+    if(!context) {
+        printf("CREATE_WINDOW ERROR: Could not create context\n");
+        exit(1);
+    }
+
+    *win = window;
+    *ctx = context;
 }
 
 void glUtilitiesCreateWindow(const char *t) {
