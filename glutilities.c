@@ -313,8 +313,33 @@ void glUtilitiesMouseMoveFunc(void (*func)(int x, int y)) {
 
 char BUTTON_PRESSED[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-void handle_key_event() {
-    // TODO: Implement
+void handle_key_event(XEvent e, void (*proc)(unsigned char k, int x, int y), void (*modProc)(unsigned char k, int x, int y), int mapVal) {
+    char buffer[10];
+    int code = ((XKeyEvent *)&e)->keycode;
+
+    XLookupString(&e.xkey, buffer, sizeof(buffer), NULL, NULL);
+
+    char raw = buffer[0];
+    switch(code) {
+        // TODO: Implement
+    }
+
+    if(raw == 0) {
+        if(modProc) {
+            modProc(buffer[0], 0, 0);
+        }
+        else {
+            if(proc) {
+                proc(buffer[0], 0, 0);
+            }
+        }
+    }
+    else {
+        if(proc) {
+            proc(buffer[0], 0, 0);
+        }
+    }
+    KEYMAP[(int)buffer[0]] = mapVal;
 }
 
 void timer(int x) {
@@ -342,7 +367,17 @@ int glUtilitiesGet(int t) {
     struct timeval tv;
 
     switch(t) {
-        // TODO: Implement
+        case ELAPSED_TIME:
+            gettimeofofday(&tv, NULL);
+            return (tv.tv_usec - timeStart.tv_usec) / 1000 + (tv.tv_sec - timeStart.tv_sec) * 1000;
+        case WIN_WIDTH:
+            return WINDOW_WIDTH;
+        case WIN_HEIGHT:
+            return WINDOW_HEIGHT;
+        case MOUSE_POS_X:
+            return LAST_MOUSE_POS_X;
+        case MOUSE_POS_Y:
+            return LAST_MOUSE_POS_Y;
     }
 
     return 0;

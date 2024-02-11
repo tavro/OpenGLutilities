@@ -52,8 +52,8 @@
 
 #define ELAPSED_TIME		(700)
 
-#define WINDOW_WIDTH		(102)
-#define WINDOW_HEIGHT		(103)
+#define WIN_WIDTH		    (102)
+#define WIN_HEIGHT		    (103)
 
 #define MOUSE_POS_X		    (802)
 #define MOUSE_POS_Y		    (803)
