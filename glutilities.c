@@ -419,6 +419,7 @@ void timer(int x) {
     glUtilitiesRedisplay();
 }
 
+static void check_timers();
 void glUtilitiesMain() {
     char pressed = 0;
     int i;
@@ -525,7 +526,7 @@ void glUtilitiesMain() {
             idle();
         }
 
-        // TODO: (Implement and) Check timers
+        check_timers();
     }
 
     glXMakeCurrent(DISPLAY, None, NULL);
@@ -558,7 +559,105 @@ int glUtilitiesGet(int t) {
     return 0;
 }
 
-// TODO: Implement timers
+typedef struct Timer {
+    int arg;
+    int time;
+    int reapeatTime;
+    void (*func)(int arg);
+    char repeating;
+    struct Timer *next;
+    struct Timer *prev;
+} Timer;
+Timer timers = NULL;
+
+void glUtilitiesTimerFunc(int ms, void (*func)(int arg), int arg) {
+    Timer *t = (Timer*)malloc(sizeof(Timer));
+    t->arg = arg;
+	t->time = ms + glUtilitiesGet(ELAPSED_TIME);
+	t->repeatTime = 0;
+	t->repeating = 0;
+	t->func = func;
+	t->next = timers;
+	t->prev = NULL;
+    
+    if(timers) {
+        timers->prev = t;
+    }
+    timers = t;
+}
+
+void glUtilitiesRepeatingTimerFunc(int ms) {
+    Timer *t = (Timer*)malloc(sizeof(Timer));
+    t->arg = 0;
+	t->time = ms + glUtilitiesGet(ELAPSED_TIME);
+	t->repeatTime = ms;
+	t->repeating = 1;
+	t->func = NULL;
+	t->next = timers;
+	t->prev = NULL;
+
+    if(timers) {
+        timers->prev = t;
+    }
+    timers = t;
+}
+
+static void check_timers() {
+    if(timers) {
+        Timer *t, *tt = NULL;
+
+        int now = glUtilitiesGet(ELAPSED_TIME);
+        int next = now + 1000; // 1 second
+
+        t = timers;
+        for(t = timers; t != NULL; t = t->next) {
+            if(t->time < next) {
+                next = t->time;
+            }
+
+            if(t->time < now) {
+                tt = t;
+            }
+        }
+
+        if(tt) {
+            if(tt->func) {
+                tt->func(tt->arg);
+            }
+            else {
+                glUtilitiesRedisplay();
+            }
+
+            if(tt->repeating) {
+                tt->time = now + tt->repeatTime;
+            }
+            else {
+                if(tt->prev) {
+                    tt->prev->next = tt->next;
+                }
+                else {
+                    timers = tt->next;
+                }
+
+                if(tt->next) {
+                    tt->next->prev = tt->prev;
+                }
+                free(tt);
+            }
+        }
+
+        if(!ANIMATE) {
+            if(next > now) {
+                usleep((next - now) * 1000);
+            }
+        }        
+    }
+    else {
+        if(!ANIMATE) {
+            usleep(10);
+        }
+    }
+}
 
 void glUtilitiesContextVersion(int major, int minor) {
     CONTEXT_VERSION_MAJOR = major;
