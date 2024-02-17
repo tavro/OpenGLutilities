@@ -26,6 +26,9 @@ extern "C" {
 
 #include "constants.h"
 
+#include <stdlib.h>
+#include <GL/gl.h>
+
 void glUtilitiesContextVersion(int major, int minor);
 
 void glUtilitiesReshapeWindow(int w, int h);
@@ -76,6 +79,38 @@ void glUtilitiesToggleFullscreen();
 void glUtilitiesExitFullscreen();
 void glUtilitiesFullscreen();
 void glUtilitiesExit();
+
+/*
+
+SHADER UTILITIES
+
+*/
+
+void glUtilitiesReportError(const char *n);
+void glUtilitiesDump(void);
+
+GLuint glUtilitiesLoadShaders(const char *vp, const char *fp);
+GLuint glUtilitiesLoadGeoShaders(const char *vp, const char *fp, const char *gp);
+GLuint glUtilitiesLoadGeoTexShaders(const char *vp, const char *fp, const char *gp, const char *tp1, const char *tp2);
+
+/*
+
+FBO UTILITIES
+
+*/
+
+typedef struct {
+    GLuint texID;
+    GLuint fb, rb;
+    GLuint depth;
+    int w, h;
+} FBOData;
+
+FBOData *glUtilitiesInitFBO(int w, int h, int ifunc);
+FBOData *glUtilitiesInitFBODepth(int w, int h, int ifunc, int depth);
+
+void glUtilitiesUseFBO(FBOData *out, FBOData *in1, FBOData *in2);
+void glUtilitiesUpdateScreenFBO(int w, int h);
 
 #ifdef __cplusplus
 }

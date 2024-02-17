@@ -17,10 +17,11 @@ author of MicroGLUT and examiner for university computer graphics course TSKB07.
 
 */
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <GL/gl.h>
+#include <stdio.h>
 #include <math.h>
 
 #include <X11/keysym.h>
@@ -764,4 +765,400 @@ void glUtilitiesToggleFullscreen() {
 
 void glUtilitiesExit() {
     RUNNING = 0;
+}
+
+/*
+
+SHADER UTILITIES
+
+*/
+
+char* read_file(char *file) {
+    if(!file) {
+        return NULL;
+    }
+
+    FILE *fptr = fopen(file, "rb");
+    char *buf;
+    long len;
+
+    if(!fptr) {
+        return NULL;
+    }
+
+    fseek(fptr, 0, SEEK_END);
+    len = ftell(fptr);
+    buf = (char*)malloc(len + 1);
+
+    memset(buf, 0, sizeof(char)*(len + 1));
+    fseek(fptr, 0, SEEK_SET);
+    fread(buf, len, 1, fptr);
+    fclose(fptr);
+
+    buf[len] = 0;
+    return buf;
+}
+
+void print_shader_log(GLuint obj, const char *fn) {
+    GLint written = 0;
+    GLint logLen = 0;
+
+    glGetShaderiv(obj, GL_INFO_LOG_LENGTH, &logLen);
+
+    char *log;
+    if(logLen > 2) {
+        fprintf(stderr, "[from %s:]\n", fn);
+        
+        log = (char *)malloc(logLen);
+        glGetShaderInfoLog(obj, logLen, &written, log);
+        
+        fprintf(stderr, "[from %s:]\n", log);
+        free(log);
+    }
+}
+
+void print_program_log(GLuint obj, const char *vfn, const char *ffn, const char *gfn, const char *tcfn, const char *tefn) {
+    GLint written = 0;
+    GLint logLen = 0;
+	
+    glGetProgramiv(obj, GL_INFO_LOG_LENGTH, &logLen);
+
+    char *log;
+    if(logLen > 2) {
+        if(ffn == NULL) {
+			fprintf(stderr, "[from %s:]\n", vfn);
+        }
+        else if(gfn == NULL) {
+			fprintf(stderr, "[from %s+%s:]\n", vfn, ffn);
+        }
+        else if(tcfn == NULL || tefn == NULL) {
+			fprintf(stderr, "[from %s+%s+%s:]\n", vfn, ffn, gfn);
+        }
+        else {
+			fprintf(stderr, "[from %s+%s+%s+%s+%s:]\n", vfn, ffn, gfn, tcfn, tefn);
+        }
+
+        log = (char *)malloc(logLen);
+        glGetShaderInfoLog(obj, logLen, &written, log);
+
+        fprintf(stderr, "%s\n", log);
+        free(log);
+    }
+}
+
+GLuint compile_shaders(const char *vs, const char *fs, const char *gs, const char *tcs, const char *tes, const char *vp, const char *fp, const char *gp, const char *tp1, const char *tp2) {
+	GLuint v = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(v, 1, &vs, NULL);
+	glCompileShader(v);
+    
+    GLuint f, g, tc, te;
+    if(fs) {
+		f = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(f, 1, &fs, NULL);
+		glCompileShader(f);
+    }
+
+    if(gs) {
+        g = glCreateShader(GL_GEOMETRY_SHADER);
+		glShaderSource(g, 1, &gs, NULL);
+		glCompileShader(g);
+    }
+
+#ifdef GL_TESS_CONTROL_SHADER
+    if(tcs) {
+        tc = glCreateShader(GL_TESS_CONTROL_SHADER);
+		glShaderSource(tc, 1, &tp1, NULL);
+		glCompileShader(tc);
+    }
+
+    if(tes) {
+        te = glCreateShader(GL_TESS_EVALUATION_SHADER);
+		glShaderSource(te, 1, &tp2, NULL);
+		glCompileShader(te);
+    }
+#endif
+
+	GLuint p = glCreateProgram();
+    if(vs) {
+        glAttachShader(p, v);
+    }
+
+    if(fs) {
+        glAttachShader(p, f);
+    }
+
+    if(gs) {
+        glAttachShader(p, g);
+    }
+
+    if(tcs) {
+        glAttachShader(p, tc);
+    }
+
+    if(tes) {
+        glAttachShader(p, te);
+    }
+    glLinkProgram(p);
+	glUseProgram(p);
+
+    if(vs) {
+        print_shader_log(v, vp);
+    }
+
+    if(fs) {
+        print_shader_log(f, fp);
+    }
+
+    if(gs) {
+        print_shader_log(g, gp);
+    }
+
+    if(tcs) {
+        print_shader_log(tc, tp1);
+    }
+
+    if(tes) {
+        print_shader_log(te, tp2);
+    }
+
+    print_program_log(p, vp, fp, gp, tp1, tp2);
+    return p;
+}
+
+GLuint glUtilitiesLoadShaders(const char *vp, const char *fp) {
+    return glUtilitiesLoadGeoTexShaders(vp, fp, NULL, NULL, NULL);
+}
+
+GLuint glUtilitiesLoadGeoShaders(const char *vp, const char *fp, const char *gp) {
+	return glUtilitiesLoadGeoTexShaders(vp, fp, gp, NULL, NULL);
+}
+
+GLuint glUtilitiesLoadGeoTexShaders(const char *vp, const char *fp, const char *gp, const char *tp1, const char *tp2) {
+    char *vs = read_file((char *)vp);
+    if(!vs && vp) {
+		fprintf(stderr, "Failed to read %s from disk.\n", vp);
+    }
+
+    char *fs = read_file((char *)fp);
+    if(!fs && fp) {
+		fprintf(stderr, "Failed to read %s from disk.\n", fp);
+    }
+
+    char *gs = read_file((char *)gp);
+    if(!gs && gp) {
+		fprintf(stderr, "Failed to read %s from disk.\n", gp);
+    }
+
+    char *tcs = read_file((char *)tp1);
+    if(tcs && tp1) {
+		fprintf(stderr, "Failed to read %s from disk.\n", tp1);
+    }
+
+    char *tes = read_file((char *)tp2);
+    if(tes && tp2) {
+		fprintf(stderr, "Failed to read %s from disk.\n", tp2);
+    }
+
+	GLuint p = 0;
+    if(vs && fs) {
+        p = compile_shaders(vs, fs, gs, tcs, tes, vp, fp, gp, tp1, tp2);
+    }
+
+    if(vs) {
+        free(vs);
+    }
+
+    if(fs) {
+        free(fs);
+    }
+
+    if(gs) {
+        free(gs);
+    }
+
+    if(tcs) {
+        free(tcs);
+    }
+
+    if(tes) {
+        free(tes);
+    }
+
+    return p;
+}
+
+void glUtilitiesDump(void) {
+    printf("vendor: %s\n", glGetString(GL_VENDOR));
+    printf("renderer: %s\n", glGetString(GL_RENDERER));
+    printf("version: %s\n", glGetString(GL_VERSION));
+    printf("GLSL: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+    
+    glUtilitiesReportError("dump");
+}
+
+static GLenum LAST_ERR = 0;
+static char LAST_ERR_FUNC[1024] = "";
+void glUtilitiesReportError(const char *n) {
+    GLenum err;
+    while((err = glGetError()) != GL_NO_ERROR) {
+        if(LAST_ERR != err || strcmp(n, LAST_ERR_FUNC)) {
+            fprintf(stderr, "GL error 0x%X detected in %s\n", err, n);
+	        strcpy(LAST_ERR_FUNC, n);
+            LAST_ERR = err;
+        }
+    }
+}
+
+/*
+
+FBO UTILITIES
+
+*/
+
+void buffer_status() {
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if(status != GL_FRAMEBUFFER_COMPLETE) {
+        fprintf(stderr, "Framebuffer not complete!\n");
+    }
+}
+
+FBOData *glUtilitiesInitFBO(int w, int h, int ifunc) {
+    FBOData *fbo = (FBOData *)malloc(sizeof(FBOData));
+    fbo->w = w;
+    fbo->h = h;
+
+    glGenFramebuffers(1, &fbo->fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo->fb);
+	glGenTextures(1, &fbo->texID);
+	fprintf(stderr, "%i\n",fbo->texID);
+	glBindTexture(GL_TEXTURE_2D, fbo->texID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    if(ifunc == 0) {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }
+    else {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    }
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo->texID, 0);
+    
+    glGenRenderbuffers(1, &fbo->rb);
+    glBindRenderbuffer(GL_RENDERBUFFER, fbo->rb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, fbo->w, fbo->h);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, fbo->rb);
+    buffer_status();
+
+	fprintf(stderr, "FBO %d\n", fbo->fb);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return fbo;
+}
+
+FBOData *glUtilitiesInitFBODepth(int w, int h, int ifunc, int depth) {
+    FBOData *fbo = (FBOData *)malloc(sizeof(FBOData));
+    fbo->w = w;
+    fbo->h = h;
+
+    glGenRenderbuffers(1, &fbo->rb);
+    glGenFramebuffers(1, &fbo->fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo->fb);
+    glGenTextures(1, &fbo->texID);
+    fprintf(stderr, "%i\n",fbo->texID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    
+    if(ifunc) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }
+    else {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo->texID, 0);
+    if (depth != 0) {
+        glGenTextures(1, &fbo->depth);
+        glBindTexture(GL_TEXTURE_2D, fbo->depth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0L);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo->depth, 0);
+        fprintf(stderr, "Depth Tex: %i\n",fbo->depth);
+    }
+
+    glBindRenderbuffer(GL_RENDERBUFFER, fbo->rb);
+    buffer_status();
+
+    fprintf(stderr, "FBO %d\n", fbo->fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return fbo;
+}
+
+static int LAST_W = 0;
+static int LAST_H = 0;
+void glUtilitiesUpdateScreenFBO(int w, int h) {
+    LAST_W = w;
+    LAST_H = h;
+}
+
+void glUtilitiesUseFBO(FBOData *out, FBOData *in1, FBOData *in2) {
+    GLint curfbo;
+
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &curfbo);
+    if(curfbo == 0) {
+		GLint viewport[4] = {0, 0, 0, 0};
+		glGetIntegerv(GL_VIEWPORT, viewport);
+
+		GLint w, h;
+        w = viewport[2] - viewport[0];
+		h = viewport[3] - viewport[1];
+
+        static unsigned int FBW = 65536;
+        if(w > 0 && h > 0 && w < FBW && h < FBW) {
+            glUtilitiesUpdateScreenFBO(w, h);
+        }
+    }
+
+    if(out != 0L) {
+		glViewport(0, 0, out->w, out->h);
+    }
+    else {
+		glViewport(0, 0, LAST_W, LAST_H);
+    }
+
+    if(out != 0L) {
+		glBindFramebuffer(GL_FRAMEBUFFER, out->fb);
+		glViewport(0, 0, out->w, out->h);
+    }
+    else {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+	glActiveTexture(GL_TEXTURE0);
+    if(in1 != 0L) {
+		glBindTexture(GL_TEXTURE_2D, in1->texID);
+    }
+    else {
+		glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+	glActiveTexture(GL_TEXTURE1);
+    if(in2 != 0L) {
+		glBindTexture(GL_TEXTURE_2D, in2->texID);
+    }
+    else {
+		glBindTexture(GL_TEXTURE_2D, 0);
+    }
 }
