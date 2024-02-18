@@ -57,3 +57,25 @@
 
 #define MOUSE_POS_X		    (802)
 #define MOUSE_POS_Y		    (803)
+
+/*
+
+MODEL UTILITIES
+
+*/
+
+#define MAX_ERRORS 8
+
+/*
+
+TGA UTILITIES
+
+*/
+
+#define	ERR_OPEN			-5
+#define ERR_READ			-4
+#define ERR_INDEXED_COLOR   -3
+#define ERR_MEMORY			-2
+#define ERR_COMPRESSED		-1
+#define OK					 0
+

@@ -17,6 +17,7 @@ author of MicroGLUT and examiner for university computer graphics course TSKB07.
 
 */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1161,4 +1162,1425 @@ void glUtilitiesUseFBO(FBOData *out, FBOData *in1, FBOData *in2) {
     else {
 		glBindTexture(GL_TEXTURE_2D, 0);
     }
+}
+
+/*
+
+MODEL UTILITIES
+
+*/
+
+static char LINE_END = 0;
+static char FILE_END = 0;
+
+static char parse_string(char *line, int *pos, char *s) {
+    char c = line[(*pos)++];
+    while(c == 32 || c == 9) {
+        c = line[(*pos)++]; // skip trailing spaces
+    }
+
+    int i = 0;
+    while(c != 0 && c != 32 && c != 9  && c != EOF && c != '/' && i < 254) {
+		s[i++] = c;
+		c = line[(*pos)++];
+    }
+
+    LINE_END = (c == 0);
+	s[i] = 0;
+
+    return c;
+}
+
+static float parse_float(char *line, int *pos) {
+	char s[255];
+	parse_string(line, pos, s);
+	
+    float val = 0.0;
+	sscanf(s, "%f", &val);
+	if (isnan(val) || isinf(val))  {
+		val = 0.0;
+    }
+    
+	return val;
+}
+
+static int parse_int(char *line, int *pos, char *endc) {
+	char s[255];
+    char c = parse_string(line, pos, s);
+	if (endc) {
+        *endc = c;
+    }
+
+	int val = 0;
+	if (strlen(s) == 0) {
+		val = -1;
+    }
+    else {
+		sscanf(s, "%d", &val);
+    }
+
+	return val;
+}
+
+static vec3 parse_vec3(char *line, int *pos) {
+	vec3 v;
+	v.x = parse_float(line, pos);
+	v.y = parse_float(line, pos);
+	v.z = parse_float(line, pos);
+	return v;
+}
+
+void parse_line(FILE *fp, char *line) {
+	int i, j;
+	char c = '_';
+	for (i = 0, j = 0; i < 2048; i++) {
+		c = getc(fp);
+		if (c != 10 && c != 13) {
+			line[j++] = c;
+        }
+
+		if (c == EOF || ((c == 10 || c == 13) && j > 0)) {
+			if (c == EOF) {
+                FILE_END = 1;
+            }
+			line[j] = 0;
+			return;
+        }
+    }
+	line[j] = 0;
+}
+
+// TODO: Materials
+
+typedef struct Mesh {
+	vec3	*vertexNormals;
+	vec2	*textureCoords;
+	vec3	*vertices;
+	
+	int		normalsCount;
+    int		vertexCount;
+	int		coordCount;
+	int		groupCount;
+	int		texCount;
+	
+	int		*coordIndex;
+	int		*normalsIndex;
+	int		*textureIndex;
+
+	int		*coordStarts;
+	
+	char	*materialName;
+} Mesh, *MeshPtr;
+
+static int NORMAL_COUNT;
+static int COORD_COUNT;
+static int VERT_COUNT;
+static int TEX_COUNT;
+
+static int ZERO_FIX;
+
+static char HAS_POS_IDXS;
+static char HAS_TEX_IDXS;
+static char HAS_NORMAL_IDXS;
+
+// TODO: Material globals
+
+static char parse_obj(const char *n, MeshPtr mp) {
+    int lastCoordCount = -1;
+    
+    FILE *fp = fopen(n, "rb");
+    if(!fp) {
+		fprintf(stderr, "File \"%s\" could not be opened\n", n);
+        return -1;
+    }
+
+    NORMAL_COUNT = 0;
+    COORD_COUNT = 0;
+    VERT_COUNT = 0;
+    TEX_COUNT = 0;
+
+    LINE_END = 0;
+    FILE_END = 0;
+
+    while(!FILE_END) {
+		char line[2048];
+		parse_line(fp, line);
+
+        int pos = 0;
+        char s[256];
+		parse_string(line, &pos, s);
+		if (strcmp(s, "v") == 0) {
+			vec3 v = parse_vec3(line, &pos);
+            if(mp->vertices) {
+                mp->vertices[VERT_COUNT++] = v;
+            }
+            else {
+                VERT_COUNT += 1;
+            }
+        }
+
+		if (strcmp(s, "vn") == 0) {
+			vec3 v = parse_vec3(line, &pos);
+            if(mp->vertexNormals) {
+                mp->vertexNormals[NORMAL_COUNT++] = v;
+            }
+            else {
+                NORMAL_COUNT += 1;
+            }
+        }
+
+		if (strcmp(s, "vt") == 0) {
+			vec3 v = parse_vec3(line, &pos);
+            if(mp->textureCoords) {
+                mp->textureCoords[TEX_COUNT].x = v.x;
+                mp->textureCoords[TEX_COUNT++].y = v.y;
+            }
+            else {
+                TEX_COUNT += 1;
+            }
+        }
+
+		if (strcmp(s, "f") == 0) {
+			char done = 0;
+			char *ns;
+
+			int i = -1;
+            int p = -1;
+			int p1;
+
+            for(i = pos; !done; pos++) {
+				if (line[pos] == 0) {
+                    done = 1;
+                }
+
+                if(p >= 0) {
+					char c = line[pos];
+					if (c == '/' || c == ' ' || c == 0) {
+                        ns = &line[p1];
+                        line[pos] = 0;
+                        if(p1 != pos) {
+							i = atoi(ns);
+							if(i == 0) {
+                                ZERO_FIX = 1;
+                            }
+
+                            if(i < 0) {
+								switch (p) {
+                                    case 0:
+                                        i = VERT_COUNT + i + 1;
+                                        break;
+                                    case 1:
+                                        i = TEX_COUNT + i + 1;
+                                        break;
+                                    case 2:
+                                        i = NORMAL_COUNT + i + 1;
+                                        break;
+                                }
+                            }
+                            i = i + ZERO_FIX;
+                        }
+                        else {
+                            i = 0;
+                        }
+
+                        if(i > 0) {
+						    switch (p) {
+							    case 0:
+                                    if(mp->coordIndex) {
+                                        mp->coordIndex[COORD_COUNT - 1] = i - 1;
+                                    }
+                                    break;
+							    case 1:
+                                    if(mp->textureIndex) {
+                                        if(i >= 0) {
+                                            mp->textureIndex[COORD_COUNT - 1] = i - 1;
+                                        }
+                                    }
+                                    HAS_TEX_IDXS = 1;
+                                    break;
+							    case 2:
+                                    if(mp->normalsIndex) {
+                                        if(i >= 0) {
+                                            mp->normalsIndex[COORD_COUNT - 1] = i - 1;
+                                        }
+                                    }
+                                    HAS_NORMAL_IDXS = 1;
+                                    break;
+                            }
+                            p1 = pos + 1;
+                            p++;
+                        }
+                    }
+
+                    if(c == ' ') {
+                        p = -1;
+                    }
+                }
+                else if(line[pos] != ' ') {
+                    if(!done) {
+                        COORD_COUNT++;
+                    }
+                    p1 = pos;
+                    p = 0;
+                }
+            }
+
+            if(mp->coordIndex) {
+                mp->coordIndex[COORD_COUNT] = -1;
+            }
+            
+            if(mp->textureIndex) {
+                mp->textureIndex[COORD_COUNT] = -1;
+            }
+
+            if(mp->normalsIndex) {
+                mp->normalsIndex[COORD_COUNT] = -1;
+            }
+            COORD_COUNT++;
+        }
+
+        // TODO: Handle materials
+    }
+
+    if(COORD_COUNT > lastCoordCount) {
+        mp->groupCount += 1;
+        if(mp->coordStarts) {
+            mp->coordStarts[mp->groupCount] = COORD_COUNT;
+        }
+    }
+
+    fclose(fp);
+    
+    // TODO: Handle materials
+
+    return 0;
+}
+
+static struct Mesh *load_obj(const char *n) {
+	Mesh *mp = (Mesh *)calloc(sizeof(Mesh), 1);
+
+    HAS_NORMAL_IDXS = 0;
+    HAS_TEX_IDXS = 0;
+    HAS_POS_IDXS = 1;
+
+    mp->coordStarts = NULL;
+    mp->groupCount = 0;
+
+    // TODO: Materials
+
+    NORMAL_COUNT = 0;
+    COORD_COUNT = 0;
+    VERT_COUNT = 0;
+    TEX_COUNT = 0;
+    ZERO_FIX = 0;
+
+    parse_obj(n, mp);
+
+    if(VERT_COUNT > 0) {
+        mp->vertices = (vec3 *)malloc(sizeof(vec3) * VERT_COUNT);
+    }
+
+    if(TEX_COUNT > 0) {
+        mp->textureCoords = (vec2 *)malloc(sizeof(vec2) * TEX_COUNT);
+    }
+
+    if(NORMAL_COUNT > 0) {
+        mp->vertexNormals = (vec3 *)malloc(sizeof(vec3) * NORMAL_COUNT);
+    }
+
+    if(HAS_POS_IDXS) {
+        mp->coordIndex = (int *)calloc(COORD_COUNT, sizeof(int));
+    }
+
+    if(HAS_NORMAL_IDXS) {
+        mp->normalsIndex = (int *)calloc(COORD_COUNT, sizeof(int));
+    }
+
+    if(HAS_TEX_IDXS) {
+        mp->textureIndex = (int *)calloc(COORD_COUNT, sizeof(int));
+    }
+
+    // TODO: Materials
+    mp->coordStarts = (int *)calloc(sizeof(int) * (mp->groupCount + 2), 1);
+	mp->groupCount = 0;
+
+    NORMAL_COUNT = 0;
+    COORD_COUNT = 0;
+    VERT_COUNT = 0;
+    TEX_COUNT = 0;
+
+    parse_obj(n, mp);
+
+    mp->normalsCount = NORMAL_COUNT;
+    mp->vertexCount = VERT_COUNT;
+    mp->coordCount = COORD_COUNT;
+    mp->texCount = TEX_COUNT;
+
+    return mp;
+}
+
+void to_triangles(struct Mesh *mp) {
+    int *newTextureIndex;
+    int *newNormalsIndex;
+    int *newCoords;
+
+    int newIndex = 0;
+    int first = 0;
+   
+    int i;
+    int vertexCount = 0;
+    int triangleCount = 0;
+    for(i = 0; i < mp->coordCount; i++) {
+        if(mp->coordIndex[i] == -1) {
+            if(vertexCount > 2) {
+                triangleCount += vertexCount - 2;
+            }
+            vertexCount = 0;
+        }
+        else {
+            vertexCount = vertexCount + 1;
+        }
+    }
+
+    newCoords = (int *)calloc(triangleCount * 3, sizeof(int));
+    if(mp->normalsIndex) {
+		newNormalsIndex = (int *)calloc(triangleCount * 3, sizeof(int));
+    }
+
+    if(mp->textureIndex) {
+		newTextureIndex = (int *)calloc(triangleCount * 3, sizeof(int));
+    }
+
+    vertexCount = 0;
+    for(i = 0; i < mp->coordCount; i++) {
+		if (mp->coordIndex[i] == -1) {
+			vertexCount = 0;
+			first = i + 1;
+        }
+        else {
+			vertexCount = vertexCount + 1;
+			if (vertexCount > 2) {
+                newCoords[newIndex++] = mp->coordIndex[first];
+				newCoords[newIndex++] = mp->coordIndex[i - 1];
+				newCoords[newIndex++] = mp->coordIndex[i];
+                if(mp->normalsIndex) {
+					newNormalsIndex[newIndex - 3] = mp->normalsIndex[first];
+					newNormalsIndex[newIndex - 2] = mp->normalsIndex[i - 1];
+					newNormalsIndex[newIndex - 1] = mp->normalsIndex[i];
+                }
+
+                if(mp->textureIndex) {
+					newTextureIndex[newIndex - 3] = mp->textureIndex[first];
+					newTextureIndex[newIndex - 2] = mp->textureIndex[i - 1];
+					newTextureIndex[newIndex - 1] = mp->textureIndex[i];
+                }
+            }
+        }
+    }
+
+    free(mp->coordIndex);
+    mp->coordIndex = newCoords;
+	mp->coordCount = triangleCount * 3;
+
+    if(mp->normalsIndex) {
+        free(mp->normalsIndex);
+		mp->normalsIndex = newNormalsIndex;
+    }
+
+    if(mp->textureIndex) {
+        free(mp->textureIndex);
+		mp->textureIndex = newTextureIndex;
+    }
+}
+
+/*
+
+TODO: Move temporary functions
+
+*/
+
+mat4 transpose(mat4 m) {
+	mat4 a;
+		
+	a.m[0] = m.m[0]; a.m[4] = m.m[1]; a.m[8] = m.m[2];      
+    a.m[12] = m.m[3];
+	a.m[1] = m.m[4]; a.m[5] = m.m[5]; a.m[9] = m.m[6];      
+    a.m[13] = m.m[7];
+	a.m[2] = m.m[8]; a.m[6] = m.m[9]; a.m[10] = m.m[10];    
+    a.m[14] = m.m[11];
+	a.m[3] = m.m[12]; a.m[7] = m.m[13]; a.m[11] = m.m[14];    
+    a.m[15] = m.m[15];
+		
+	return a;
+}
+
+mat4 frustum(float left, float right, float bottom, float top, float znear, float zfar) {
+    float temp, temp2, temp3, temp4;
+    mat4 matrix;
+    
+    temp = 2.0f * znear;
+    temp2 = right - left;
+    temp3 = top - bottom;
+    temp4 = zfar - znear;
+
+    matrix.m[0] = temp / temp2; // 2*near/(right-left)
+    matrix.m[1] = 0.0;
+    matrix.m[2] = 0.0;
+    matrix.m[3] = 0.0;
+    matrix.m[4] = 0.0;
+    matrix.m[5] = temp / temp3; // 2*near/(top - bottom)
+    matrix.m[6] = 0.0;
+    matrix.m[7] = 0.0;
+    matrix.m[8] = (right + left) / temp2; // A = r+l / r-l
+    matrix.m[9] = (top + bottom) / temp3; // B = t+b / t-b
+    matrix.m[10] = (-zfar - znear) / temp4; // C = -(f+n) / f-n
+    matrix.m[11] = -1.0;
+    matrix.m[12] = 0.0;
+    matrix.m[13] = 0.0;
+    matrix.m[14] = (-temp * zfar) / temp4; // D = -2fn / f-n
+    matrix.m[15] = 0.0;
+    
+    return transpose(matrix);
+}
+
+vec3 vsub(vec3 a, vec3 b) {
+	vec3 res;
+	res.x = a.x - b.x;
+	res.y = a.y - b.y;
+	res.z = a.z - b.z;
+	return res;
+}
+	
+vec3 vadd(vec3 a, vec3 b) {
+	vec3 res;
+	res.x = a.x + b.x;
+	res.y = a.y + b.y;
+	res.z = a.z + b.z;
+	return res;
+}
+
+vec3 scalar(vec3 a, GLfloat s) {
+	vec3 res;
+		
+	res.x = a.x * s;
+	res.y = a.y * s;
+	res.z = a.z * s;
+	
+	return res;
+}
+
+GLfloat dot(vec3 a, vec3 b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+vec3 cross(vec3 a, vec3 b){
+	vec3 res;
+
+	res.x = a.y * b.z - a.z * b.y;
+	res.y = a.z * b.x - a.x * b.z;
+	res.z = a.x * b.y - a.y * b.x;
+
+	return res;
+}
+
+GLfloat norm(vec3 a) {
+	return (GLfloat)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+}
+
+static void generate_normals(Mesh* m) {
+    if(m->vertices && !m->vertexNormals) {
+        m->vertexNormals = (vec3 *)calloc(sizeof(vec3) * m->vertexCount, 1);
+        m->normalsCount = m->vertexCount;
+        m->normalsIndex = (int *)calloc(m->coordCount, sizeof(GLuint));
+		memcpy(m->normalsIndex, m->coordIndex, sizeof(GLuint) * m->coordCount);
+    
+		int face;
+		int normalIndex;
+        for(face = 0; face * 3 < m->coordCount; face++) {
+            int i0 = m->coordIndex[face * 3 + 0];
+            int i1 = m->coordIndex[face * 3 + 1];
+            int i2 = m->coordIndex[face * 3 + 2];
+
+            vec3 v0 = vsub(m->vertices[i1], m->vertices[i0]); // TODO: Implement vsub
+            vec3 v1 = vsub(m->vertices[i2], m->vertices[i0]);
+            vec3 v2 = vsub(m->vertices[i2], m->vertices[i1]);
+
+            float sqrLen0 = dot(v0, v0); // TODO: Implement dot
+			float sqrLen1 = dot(v1, v1);
+			float sqrLen2 = dot(v2, v2);
+
+            float len0 = 1e-3f;
+            if(sqrLen0 >= 1e-6f) {
+                len0 = sqrt(sqrLen0);
+            }
+
+            float len1 = 1e-3f;
+            if(sqrLen1 >= 1e-6f) {
+                len1 = sqrt(sqrLen1);
+            }
+
+            float len2 = 1e-3f;
+            if(sqrLen2 >= 1e-6f) {
+                len2 = sqrt(sqrLen2);
+            }
+
+            float influence0 =  dot(v0, v1) / (len0 * len1);
+			float influence1 = -dot(v0, v2) / (len0 * len2);
+			float influence2 =  dot(v1, v2) / (len1 * len2);
+
+            float angle0 = acos(influence0);
+            if(influence0 >= 1.f) {
+                angle0 = 0;
+            }
+            else if(influence0 <= -1.f) {
+                angle0 = M_PI;
+            }
+
+            float angle1 = acos(influence1);
+            if(influence1 >= 1.f) {
+                angle1 = 0;
+            }
+            else if(influence1 <= -1.f) {
+                angle1 = M_PI;
+            }
+
+            float angle2 = acos(influence2);
+            if(influence2 >= 1.f) {
+                angle2 = 0;
+            }
+            else if(influence2 <= -1.f) {
+                angle2 = M_PI;
+            }
+
+            vec3 normal = cross(v0, v1);
+			m->vertexNormals[i0] = vadd(scalar(normal, angle0), m->vertexNormals[i0]); // TODO: Implement vadd, scalar
+			m->vertexNormals[i1] = vadd(scalar(normal, angle1), m->vertexNormals[i1]);
+			m->vertexNormals[i2] = vadd(scalar(normal, angle2), m->vertexNormals[i2]);
+        }
+
+        for(normalIndex = 0; normalIndex < m->normalsCount; normalIndex++) {
+			float len = norm(m->vertexNormals[normalIndex]);
+            if(len > 0.01f) {
+				m->vertexNormals[normalIndex] = scalar(m->vertexNormals[normalIndex], 1 / len);
+            }
+        }
+    }
+}
+
+static Model* generate_model(Mesh* m) {
+    typedef struct {
+        int posIndex;
+        int texIndex;
+        int normalIndex;
+        int newIndex;
+    } IndexTriplet;
+
+    int hashGap = 6;
+    int indexHMSize = (m->vertexCount * hashGap + m->coordCount);
+    
+    IndexTriplet *indexHashMap = (IndexTriplet *)malloc(sizeof(IndexTriplet) * indexHMSize);
+    
+    int numNewVertices = 0;
+
+    Model* model = (Model *)malloc(sizeof(Model));
+	memset(model, 0, sizeof(Model));
+
+    model->indexArray = (GLuint *)malloc(sizeof(GLuint) * m->coordCount);
+	model->numIndices = m->coordCount;
+
+	memset(indexHashMap, 0xff, sizeof(IndexTriplet) * indexHMSize);
+
+    int i;
+    int max;
+    for(i = 0; i < m->coordCount; i++) {
+        IndexTriplet currVert = {-1, -1, -1, -1};
+		int insertPos = 0;
+
+        if(m->coordIndex) {
+			currVert.posIndex = m->coordIndex[i];
+        }
+
+        if(m->normalsIndex) {
+			currVert.normalIndex = m->normalsIndex[i];
+        }
+
+        if(m->textureIndex) {
+			currVert.texIndex = m->textureIndex[i];
+        }
+
+        if(max < currVert.texIndex) {
+			max = currVert.texIndex;
+        }
+
+		if (currVert.posIndex >= 0) {
+			insertPos = currVert.posIndex * hashGap;
+        }
+
+        while(true) {
+			if (indexHashMap[insertPos].newIndex == -1) {
+				currVert.newIndex = numNewVertices++;
+				indexHashMap[insertPos] = currVert;
+				break;
+            }
+            else if(indexHashMap[insertPos].posIndex == currVert.posIndex && indexHashMap[insertPos].normalIndex == currVert.normalIndex && indexHashMap[insertPos].texIndex == currVert.texIndex) {
+				currVert.newIndex = indexHashMap[insertPos].newIndex;
+                break;
+            }
+            else {
+				insertPos++;
+            }
+        }
+
+        model->indexArray[i] = currVert.newIndex;
+    }
+
+    for(i = 0; i < indexHMSize; i++) {
+		if (indexHashMap[i].newIndex != -1) {
+			if (m->vertices) {
+				model->vertexArray[indexHashMap[i].newIndex] = m->vertices[indexHashMap[i].posIndex];
+            }
+
+            if (m->vertexNormals) {
+				model->normalArray[indexHashMap[i].newIndex] = m->vertexNormals[indexHashMap[i].normalIndex];
+            }
+
+            if (m->textureCoords) {
+				model->texCoordArray[indexHashMap[i].newIndex] = m->textureCoords[indexHashMap[i].texIndex];
+            }
+        }
+    }
+
+    free(indexHashMap);
+
+    // TODO: Materials
+
+    return model;
+}
+
+Mesh **split_to_meshes(Mesh *m) {
+    int *mapc = (int *)malloc(m->vertexCount * sizeof(int));
+	int *mapt = (int *)malloc(m->texCount * sizeof(int));
+	int *mapn = (int *)malloc(m->normalsCount * sizeof(int));
+
+	if (m == NULL || m ->vertices == NULL || m->vertexCount == 0) {
+		printf("Invalid mesh!\n");
+		return NULL;
+    }
+
+	Mesh **mm = (Mesh **)calloc(sizeof(Mesh *), m->groupCount + 2);
+	for (int mi = 0; mi < m->groupCount; mi++) {
+		int from = m->coordStarts[mi];
+		int to = m->coordStarts[mi + 1];
+
+		mm[mi] = (Mesh *)calloc(sizeof(Mesh), 1);
+
+		for (int i = 0; i < m->vertexCount; i++) {
+			mapc[i] = -1;
+        }
+
+		for (int i = 0; i < m->texCount; i++) {
+			mapt[i] = -1;
+        }
+
+		for (int i = 0; i < m->normalsCount; i++) {
+			mapn[i] = -1;
+        }
+
+		int intNormalsCount = 0;
+        int intVertexCount = 0;
+		int intTexCount = 0;
+
+        for (int j = from; j < to; j++) {
+			int ix = m->coordIndex[j];
+			if (ix > -1) {
+				if (mapc[ix] == -1) {
+					mapc[ix] = ix;
+					intVertexCount++;
+                }
+            }
+			if (m->textureIndex) {
+				ix = m->textureIndex[j];
+				if (ix > -1) {
+					if (mapt[ix] == -1) {
+						mapt[ix] = ix;
+						intTexCount++;
+                    }
+                }
+            }
+			if (m->normalsIndex) {
+				ix = m->normalsIndex[j];
+				if (ix > -1) {
+					if (mapn[ix] == -1) {
+						mapn[ix] = ix;
+						intNormalsCount++;
+                    }
+                }
+            }
+        }
+
+        mm[mi]->coordIndex = (int *)malloc((to - from) * sizeof(int));
+		mm[mi]->textureIndex = (int *)malloc((to - from) * sizeof(int));
+		mm[mi]->normalsIndex = (int *)malloc((to - from) * sizeof(int));
+
+		if (intVertexCount > 0) {
+			mm[mi]->vertices = (vec3 *)malloc(intVertexCount * sizeof(vec3));
+        }
+
+		if (intTexCount > 0) {
+			mm[mi]->textureCoords = (vec2 *)malloc(intTexCount * sizeof(vec2));
+        }
+
+		if (intNormalsCount > 0) {
+			mm[mi]->vertexNormals = (vec3 *)malloc(intNormalsCount * sizeof(vec3));
+        }
+
+        mm[mi]->vertexCount = intVertexCount;
+		mm[mi]->texCount = intTexCount;
+		mm[mi]->normalsCount = intNormalsCount;
+
+		for (int i = 0; i < m->vertexCount; i++) {
+			mapc[i] = -1;
+        }
+        
+		for (int i = 0; i < m->texCount; i++) {
+			mapt[i] = -1;
+        }
+
+		for (int i = 0; i < m->normalsCount; i++) {
+			mapn[i] = -1;
+        }
+
+        int mapcCount = 0;
+		int maptCount = 0;
+		int mapnCount = 0;
+        for (int j = from; j < to; j++) {
+			int ix = m->coordIndex[j];
+			if (ix > -1) {
+                if (mapc[ix] == -1) {
+					mapc[ix] = mapcCount++;
+					mm[mi]->vertices[mapc[ix]] = m->vertices[ix];
+                }
+				mm[mi]->coordIndex[j - from] = mapc[ix];
+            }
+            else {
+				mm[mi]->coordIndex[j - from] = -1;
+            }
+
+			if (m->textureIndex) {
+			    if (mm[mi]->textureIndex) {
+				    ix = m->textureIndex[j];
+				    if (ix > -1) {
+					    if (mapt[ix] == -1) {
+						    mapt[ix] = maptCount++;
+						    mm[mi]->textureCoords[mapt[ix]] = m->textureCoords[ix];
+                        }
+					    mm[mi]->textureIndex[j - from] = mapt[ix];
+                    }
+                }
+                else {
+					mm[mi]->textureIndex[j - from] = -1;
+                }
+            }
+
+            if(m->normalsIndex) {
+			    if (mm[mi]->normalsIndex) {
+				    ix = m->normalsIndex[j];
+				    if (ix > -1) {
+                        if (mapn[ix] == -1) {
+						    mapn[ix] = mapnCount++;
+						    mm[mi]->vertexNormals[mapn[ix]] = m->vertexNormals[ix];
+                        }
+					    mm[mi]->normalsIndex[j - from] = mapn[ix];
+                    }
+                    else {
+					    mm[mi]->normalsIndex[j - from] = -1;
+                    }
+                }
+            }
+        }
+
+		mm[mi]->coordCount = to - from;
+        // TODO: Materials
+    }
+
+    return mm;
+}
+
+static void dispose_mesh(Mesh *m) {
+    if(m) {
+        if(m->vertices) {
+            free(m->vertices);
+        }
+
+        if(m->vertexNormals) {
+            free(m->vertexNormals);
+        }
+
+        if(m->textureCoords) {
+            free(m->textureCoords);
+        }
+
+        if(m->coordIndex) {
+            free(m->coordIndex);
+        }
+
+        if(m->normalsIndex) {
+            free(m->normalsIndex);
+        }
+
+        if(m->textureIndex) {
+            free(m->textureIndex);
+        }
+
+        // TODO: Materials
+
+        free(m);
+    }
+}
+
+void glUtilitiesCenterModel(Model *m) {
+    float maxx = -1e10;
+    float maxy = -1e10;
+    float maxz = -1e10;
+    
+    float minx = 1e10;
+    float miny = 1e10;
+    float minz = 1e10;
+
+    int i;
+	for (i = 0; i < m->numVertices; i++) {
+        if(m->vertexArray[i].x < minx) {
+            minx = m->vertexArray[i].x;
+        }
+
+        if(m->vertexArray[i].x > maxx) {
+            maxx = m->vertexArray[i].x;
+        }
+
+        if(m->vertexArray[i].y < miny) {
+            miny = m->vertexArray[i].y;
+        }
+
+        if(m->vertexArray[i].y > maxy) {
+            maxy = m->vertexArray[i].y;
+        }
+
+        if(m->vertexArray[i].z < minz) {
+            minz = m->vertexArray[i].z;
+        }
+
+        if(m->vertexArray[i].z > maxz) {
+            maxz = m->vertexArray[i].z;
+        }
+    }
+
+	for (i = 0; i < m->numVertices; i++) {
+        m->vertexArray[i].x -= (maxx + minx) / 2.0f;
+		m->vertexArray[i].y -= (maxy + miny) / 2.0f;
+		m->vertexArray[i].z -= (maxz + minz) / 2.0f;
+    }
+}
+
+void glUtilitiesScaleModel(Model *m, float sx, float sy, float sz) {
+	for (long i = 0; i < m->numVertices; i++) {
+		m->vertexArray[i].x *= sx;
+		m->vertexArray[i].y *= sy;
+		m->vertexArray[i].z *= sz;
+	}
+}
+
+static void report_loader_error(const char *caller, const char *n) {
+	static unsigned int err_count = 0;
+    if(err_count < MAX_ERRORS) {
+		fprintf(stderr, "%s warning: '%s' not found in shader!\n", caller, n);
+        err_count++;
+    }
+    else if(err_count == MAX_ERRORS) {
+	    fprintf(stderr, "%s: Nr of errors bigger than %i. No more will be printed.\n", caller, MAX_ERRORS);
+        err_count++;
+    }
+}
+
+// TODO: Write helper function for glUtilitiesDrawModel & glUtilitiesDrawWireframe to avoid so much code repetition
+void glUtilitiesDrawModel(Model *m, GLuint program, const char* vertexVar, const char* normalVar, const char* textureVar) {
+    if(m) {
+        glBindVertexArray(m->vao);
+        glUseProgram(program);
+        
+		glBindBuffer(GL_ARRAY_BUFFER, m->vb);
+		GLint loc = glGetAttribLocation(program, vertexVar);
+		if(loc >= 0) {
+			glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, 0); 
+			glEnableVertexAttribArray(loc);
+        }
+        else {
+            report_loader_error("glUtilitiesDrawModel", vertexVar);
+        }
+
+		if(normalVar) {
+			loc = glGetAttribLocation(program, normalVar);
+		    if(loc >= 0) {
+				glBindBuffer(GL_ARRAY_BUFFER, m->nb);
+				glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+				glEnableVertexAttribArray(loc);
+            }
+            else {
+                report_loader_error("glUtilitiesDrawModel", normalVar);
+            }
+        }
+
+		if(m->texCoordArray && textureVar) {
+			loc = glGetAttribLocation(program, textureVar);
+			if(loc >= 0) {
+				glBindBuffer(GL_ARRAY_BUFFER, m->tb);
+				glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+				glEnableVertexAttribArray(loc);
+            }
+            else {
+                report_loader_error("glUtilitiesDrawModel", textureVar);
+            }
+        }
+
+		glDrawElements(GL_TRIANGLES, m->numIndices, GL_UNSIGNED_INT, 0L);
+    }
+}
+
+void glUtilitiesDrawWireframe(Model *m, GLuint program, const char* vertexVar, const char* normalVar, const char* textureVar) {
+	if(m) {
+		glBindVertexArray(m->vao);
+        glUseProgram(program);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m->vb);
+		GLint loc = glGetAttribLocation(program, vertexVar);
+		if(loc >= 0) {
+			glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, 0); 
+			glEnableVertexAttribArray(loc);
+        }
+        else {
+            report_loader_error("glUtilitiesDrawWireframe", vertexVar);
+        }
+
+		if (normalVar) {
+			loc = glGetAttribLocation(program, normalVar);
+			if(loc >= 0) {
+				glBindBuffer(GL_ARRAY_BUFFER, m->nb);
+				glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+				glEnableVertexAttribArray(loc);
+            }
+            else {
+                report_loader_error("glUtilitiesDrawWireframe", normalVar);
+            }
+        }
+
+		if(m->texCoordArray && textureVar) {
+			loc = glGetAttribLocation(program, textureVar);
+			if(loc >= 0) {
+				glBindBuffer(GL_ARRAY_BUFFER, m->tb);
+				glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+				glEnableVertexAttribArray(loc);
+            }
+            else {
+                report_loader_error("glUtilitiesDrawWireframe", textureVar);
+            }
+        }
+
+		glDrawElements(GL_LINE_STRIP, m->numIndices, GL_UNSIGNED_INT, 0L);
+    }
+}
+
+void glUtilitiesReloadModelData(Model *m) {
+	glBindVertexArray(m->vao);
+	
+    glBindBuffer(GL_ARRAY_BUFFER, m->vb);
+	glBufferData(GL_ARRAY_BUFFER, m->numVertices * 3 * sizeof(GLfloat), m->vertexArray, GL_STATIC_DRAW);
+	
+    glBindBuffer(GL_ARRAY_BUFFER, m->nb);
+	glBufferData(GL_ARRAY_BUFFER, m->numVertices * 3 * sizeof(GLfloat), m->normalArray, GL_STATIC_DRAW);
+    
+	if (m->texCoordArray) {
+		glBindBuffer(GL_ARRAY_BUFFER, m->tb);
+		glBufferData(GL_ARRAY_BUFFER, m->numVertices * 2 * sizeof(GLfloat), m->texCoordArray, GL_STATIC_DRAW);
+    }
+    
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->ib);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m->numIndices * sizeof(GLuint), m->indexArray, GL_STATIC_DRAW);
+}
+
+static void generate_model_buffers(Model *m) {
+    glGenVertexArrays(1, &m->vao);
+	glGenBuffers(1, &m->vb);
+	glGenBuffers(1, &m->ib);
+	glGenBuffers(1, &m->nb);
+    
+	if (m->texCoordArray) {
+		glGenBuffers(1, &m->tb);
+    }
+    
+    glUtilitiesReloadModelData(m);
+}
+
+Model* glUtilitiesLoadModel(const char* n) {
+	Mesh *mesh = load_obj(n);
+    to_triangles(mesh);
+    generate_normals(mesh);
+    
+    Model *model = generate_model(mesh);
+    dispose_mesh(mesh);
+
+    generate_model_buffers(model);
+    model->data = 0;
+
+    return model;
+}
+
+Model** glUtilitiesLoadModelSet(const char* n) {
+	Mesh *mesh = load_obj(n);
+	Mesh **mm = split_to_meshes(mesh);
+
+    int i;
+	for (i = 0; mm[i] != NULL; i++) {} // for populating i
+	
+    Model **md = (Model **)calloc(sizeof(Model *), i + 1);
+    for(i = 0; mm[i] != NULL; i++) {
+        to_triangles(mm[i]);
+        generate_normals(mm[i]);
+		md[i] = generate_model(mm[i]);
+        dispose_mesh(mm[i]);
+    }
+
+    free(mm);
+    dispose_mesh(mesh);
+    
+    // TODO: Materials
+
+    for(i = 0; md[i] != NULL; i++) {
+        generate_model_buffers(md[i]);
+		md[i]->data = 0;
+    }
+
+    return md;
+}
+
+Model* glUtilitiesLoadModelData(vec3 *vertices, vec3 *normals, vec2 *texCoords, vec3 *colors, GLuint *indices, int numVertices, int numIndices) {
+	Model* m = (Model *)malloc(sizeof(Model));
+	memset(m, 0, sizeof(Model));
+    
+    m->vertexArray = vertices;
+	m->texCoordArray = texCoords;
+	m->normalArray = normals;
+	m->indexArray = indices;
+	m->numVertices = numVertices;
+	m->numIndices = numIndices;
+	m->data = 1;
+
+    generate_model_buffers(m);
+
+    return m;
+}
+
+void glUtilitiesDisposeModel(Model *m) {
+    if(m) {
+        if(m->data == 0) {
+		    if(m->vertexArray) {
+				free(m->vertexArray);
+            }
+
+            if(m->normalArray) {
+				free(m->normalArray);
+            }
+
+            if(m->texCoordArray) {
+				free(m->texCoordArray);
+            }
+
+            if(m->colorArray) {
+				free(m->colorArray);
+            }
+
+            if(m->indexArray) {
+				free(m->indexArray);
+            }
+        }
+
+        glDeleteBuffers(1, &m->vb);
+		glDeleteBuffers(1, &m->ib);
+		glDeleteBuffers(1, &m->nb);
+		glDeleteBuffers(1, &m->tb);
+		glDeleteVertexArrays(1, &m->vao);
+
+        // TODO: Materials
+    }
+    
+    free(m);
+}
+
+/*
+
+TGA UTILITIES
+
+*/
+
+static bool MIPMAP = true;
+
+void glUtilitiesLoadTGASetMipmapping(bool active) {
+    MIPMAP = active;
+}
+
+bool glUtilitiesLoadTGATextureData(const char *n, TextureData *tex) {
+    GLuint i;
+    
+    GLubyte uncompressedHeader[12] = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	GLubyte compressedHeader[12] = {0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	
+    GLubyte uncompressedBWHeader[12] = {0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	GLubyte	compressedBWHeader[12] = {0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+	GLubyte header[12], halfHeader[6];
+    
+    int err = 0;
+	FILE *file = fopen(n, "rb");
+    if(!file) {
+        err = 1;
+    }
+    else if(fread(header, 1, sizeof(header), file) != sizeof(header)) {
+        err = 2;
+    }
+    else if(
+        (memcmp(uncompressedHeader, header, sizeof(uncompressedHeader) - 4) != 0) &&
+		(memcmp(compressedHeader, header, sizeof(compressedHeader) - 4) != 0) &&
+		(memcmp(uncompressedBWHeader, header, sizeof(uncompressedHeader) - 4) != 0) &&
+		(memcmp(compressedBWHeader, header, sizeof(compressedHeader) - 4) != 0)
+    ) {
+        err = 3;
+        for(i = 0; i < 12; i++) {
+			printf("%d ", header[i]);
+        }
+		printf("\n");
+    }
+    else if(fread(halfHeader, 1, sizeof(halfHeader), file) != sizeof(halfHeader)) {
+        err = 4;
+    }
+
+    if(err != 0) {
+        switch(err) {
+            case 1:
+                printf("could not open file %s\n", n);
+                break;
+            case 2:
+                printf("could not read header of %s\n", n);
+                break;
+            case 3:
+                printf("unsupported format in %s\n", n);
+                break;
+            case 4:
+                printf("could not read file %s\n", n);
+                break;
+        }
+
+        if(file) {
+            fclose(file);
+        }
+        return false;
+    }
+
+    tex->w = halfHeader[1] * 256 + halfHeader[0];
+	tex->h = halfHeader[3] * 256 + halfHeader[2];
+
+    if(tex->w <= 0 || tex->h <= 0 || (halfHeader[4] != 24 && halfHeader[4] != 32 && halfHeader[4] != 8)) {
+		fclose(file);
+		return false;
+    }
+
+    tex->bpp = header[4];
+    GLuint bpp = tex->bpp / 8;
+    GLuint imgSize = tex->w * tex->h * bpp;
+    
+    long stepSize = tex->w * bpp;
+    long rowSize = tex->w * bpp;
+    
+    tex->imageData = (GLubyte *)calloc(1, imgSize);
+    if(!tex->imageData) {
+        fclose(file);
+		return false;
+    }
+
+    int b;
+    int row;
+    long step;
+    GLubyte *rowP;
+    char flipped = (halfHeader[5] & 32) != 0;
+	if (flipped) {
+		step = -stepSize;
+        rowP = &tex->imageData[imgSize - stepSize];
+		row = 0 + (tex->h - 1) * stepSize;
+    }
+    else {
+		step = stepSize;
+		rowP = &tex->imageData[0];
+		row = 0;
+    }
+
+    int limit;
+    long bytes;
+    GLubyte rle;
+    GLubyte pixelData[4];
+    if (header[2] == 2 || header[2] == 3) { // uncompressed
+		for (i = 0; i < tex->h; i++) {
+			bytes = fread(rowP, 1, rowSize, file);
+			rowP += step;
+			if (bytes != rowSize) {
+				free(tex->imageData);
+                fclose(file);
+                return false;
+            }
+        }
+    }
+    else {
+		i = row;
+		limit = row + rowSize;
+
+		do {
+            bytes = fread(&rle, 1, 1, file);
+			if(rle < 128) {
+				bytes = fread(&tex->imageData[i], 1, (rle + 1) * bpp, file);
+				i += bytes;
+				if (bytes == 0) {
+                    i = imgSize;
+                }
+            }
+            else {
+				bytes = fread(&pixelData, 1, bpp, file);
+
+                do {
+					for (b = 0; b < bpp; b++) {
+						tex->imageData[i + b] = pixelData[b];
+                    }
+					i += bpp;
+					rle = rle - 1;
+                }
+                while(rle > 127);
+            }
+
+            if(i >= limit) {
+                row = row + step;
+                limit = row + rowSize;
+				i = row;
+            }
+        }
+        while(i < imgSize);
+    }
+    
+    GLuint tmp;
+    if(bpp >= 3) { // not monochrome
+        for(i = 0; i < (int)(imgSize); i += bpp) {
+            // swap 1st & 3rd byte
+            tmp = tex->imageData[i];
+		    tex->imageData[i] = tex->imageData[i + 2];
+		    tex->imageData[i + 2] = tmp;
+        }
+    }
+	fclose (file);
+
+    return true;
+}
+
+bool glUtilitiesLoadTGATexture(const char *n, TextureData *tex) {
+    char ok;
+    GLuint type = GL_RGBA;
+
+    ok = glUtilitiesLoadTGATextureData(n, tex);
+    if(!ok) {
+        return false;
+    }
+
+    glGenTextures(1, &tex->texID);
+    glBindTexture(GL_TEXTURE_2D, tex->texID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    if(tex->bpp == 8) {
+        type = GL_RED;
+    }
+
+    if(tex->bpp == 24) {
+        type = GL_RGB;
+    }
+	glTexImage2D(GL_TEXTURE_2D, 0, type, tex->w, tex->h, 0, type, GL_UNSIGNED_BYTE, tex[0].imageData);
+    
+	if(MIPMAP) {
+		glGenerateMipmap(GL_TEXTURE_2D);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    }
+    
+    return true;
+}
+
+void glUtilitiesLoadTGATextureSimple(const char *n, GLuint *tex) {
+	TextureData texture;
+    memset(&texture, 0, sizeof(texture));
+
+	if (glUtilitiesLoadTGATexture(n, &texture)) {
+		if(texture.imageData) {
+			free(texture.imageData);
+        }
+        *tex = texture.texID;
+    }
+    else {
+        *tex = 0;
+    }
+}
+
+int glUtilitiesSaveTGAData(char	*n, short int w, short int h, unsigned char pixelDepth, unsigned char *imageData) {
+    FILE *file = fopen(n, "w");
+    if(!file) {
+        return ERR_OPEN;
+    }
+
+    unsigned char aux;
+    unsigned char garbage = 0;
+	unsigned char mode = pixelDepth / 8;
+
+    char uncompressedHeader[12] = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    fwrite(&uncompressedHeader, 12, 1, file);
+	
+    fwrite(&w, sizeof(short int), 1, file);
+	fwrite(&h, sizeof(short int), 1, file);
+	fwrite(&pixelDepth, sizeof(unsigned char), 1, file);
+	fwrite(&garbage, sizeof(unsigned char), 1, file);
+
+    int i;
+    if(mode >= 3) {
+	    for (i = 0; i < w * h * mode; i += mode) {
+		    aux = imageData[i];
+		    imageData[i] = imageData[i + 2];
+		    imageData[i + 2] = aux;
+        }
+    }
+
+	int width = 1;
+	while (width < w) {
+        width = width << 1;
+    }
+
+    int ix;
+	for (i = 0; i < h; i++) {
+        ix = i * w * mode;
+		fwrite(&imageData[ix], sizeof(unsigned char), w * mode, file);
+    }
+	fclose(file);
+
+    return OK;
+}
+
+void glUtilitiesSaveTGA(TextureData *tex, char *n) {
+    glUtilitiesSaveTGAData(n, tex->w, tex->h, tex->bpp, tex->imageData);
+}
+
+void glUtilitiesSaveTGAFramebuffer(char *n, GLint x, GLint y, GLint w, GLint h) {
+    int err;
+    void *buffer = malloc(h * w * 3);
+	glReadPixels(x, y, w, h, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+    err = glUtilitiesSaveTGAData(n, w, h, 3 * 8, (unsigned char *)buffer);
+    printf("(glUtilities) SaveTGAFramebuffer returned: %d\n", err);
 }
