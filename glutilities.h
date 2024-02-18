@@ -84,6 +84,28 @@ typedef struct vec2 {
 } vec2, *vec2Ptr;
 
 mat4 frustum(float left, float right, float bottom, float top, float znear, float zfar);
+vec3 cross(vec3 a, vec3 b);
+vec3 normalize(vec3 a);
+
+vec3 setv(GLfloat x, GLfloat y, GLfloat z);
+
+mat4 setMat4(GLfloat p0, GLfloat p1, GLfloat p2, GLfloat p3,
+				GLfloat p4, GLfloat p5, GLfloat p6, GLfloat p7,
+				GLfloat p8, GLfloat p9, GLfloat p10, GLfloat p11, 
+				GLfloat p12, GLfloat p13, GLfloat p14, GLfloat p15
+				);
+
+mat4 lookAtv(vec3 p, vec3 l, vec3 v);
+
+mat4 lookAt(GLfloat px, GLfloat py, GLfloat pz, 
+			GLfloat lx, GLfloat ly, GLfloat lz,
+			GLfloat vx, GLfloat vy, GLfloat vz);
+
+/*
+
+TEMPORARY END
+
+*/
 
 void glUtilitiesContextVersion(int major, int minor);
 

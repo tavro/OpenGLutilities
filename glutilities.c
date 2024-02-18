@@ -284,6 +284,11 @@ void glUtilitiesDisplayFunc(void (*func)(void)) {
     display = func;
 }
 
+void glUtilitiesSwapBuffers() {
+	glFlush();
+	glXSwapBuffers(DISPLAY, WINDOW);
+}
+
 void glUtilitiesIdleFunc(void (*func)(void)) {
     idle = func;
 }
@@ -1673,7 +1678,7 @@ GLfloat dot(vec3 a, vec3 b) {
 	return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-vec3 cross(vec3 a, vec3 b){
+vec3 cross(vec3 a, vec3 b) {
 	vec3 res;
 
 	res.x = a.y * b.z - a.z * b.y;
@@ -1685,6 +1690,105 @@ vec3 cross(vec3 a, vec3 b){
 
 GLfloat norm(vec3 a) {
 	return (GLfloat)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+}
+
+vec3 normalize(vec3 a) {
+	GLfloat norm;
+	vec3 res;
+
+	norm = (GLfloat)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+	res.x = a.x / norm;
+	res.y = a.y / norm;
+	res.z = a.z / norm;
+	return res;
+}
+
+vec3 setv(GLfloat x, GLfloat y, GLfloat z) {
+	vec3 v;
+		
+	v.x = x;
+	v.y = y;
+	v.z = z;
+	return v;
+}
+
+mat4 setMat4(GLfloat p0, GLfloat p1, GLfloat p2, GLfloat p3,
+				GLfloat p4, GLfloat p5, GLfloat p6, GLfloat p7,
+				GLfloat p8, GLfloat p9, GLfloat p10, GLfloat p11, 
+				GLfloat p12, GLfloat p13, GLfloat p14, GLfloat p15
+				) {
+	mat4 m;
+	m.m[0] = p0;
+	m.m[1] = p1;
+	m.m[2] = p2;
+	m.m[3] = p3;
+	m.m[4] = p4;
+	m.m[5] = p5;
+	m.m[6] = p6;
+	m.m[7] = p7;
+	m.m[8] = p8;
+	m.m[9] = p9;
+	m.m[10] = p10;
+	m.m[11] = p11;
+	m.m[12] = p12;
+	m.m[13] = p13;
+	m.m[14] = p14;
+	m.m[15] = p15;
+	return m;
+}
+
+mat4 IdentityMatrix() {
+	mat4 m;
+	int i;
+
+	for (i = 0; i <= 15; i++)
+		m.m[i] = 0;
+	for (i = 0; i <= 3; i++)
+		m.m[i * 5] = 1; // 0,5,10,15
+	return m;
+}
+
+mat4 T(GLfloat tx, GLfloat ty, GLfloat tz) {
+	mat4 m;
+	m = IdentityMatrix();
+	m.m[3] = tx;
+	m.m[7] = ty;
+	m.m[11] = tz;
+	return m;
+}
+
+mat4 Mult(mat4 a, mat4 b) {
+	mat4 m;
+
+	int x, y;
+	for (x = 0; x <= 3; x++) {
+		for (y = 0; y <= 3; y++) {
+				m.m[y*4 + x] =	a.m[y*4+0] * b.m[0*4+x] +
+                a.m[y*4+1] * b.m[1*4+x] +
+				a.m[y*4+2] * b.m[2*4+x] +
+				a.m[y*4+3] * b.m[3*4+x];
+        }
+    }
+
+	return m;
+}
+
+mat4 lookAtv(vec3 p, vec3 l, vec3 v) {
+	vec3 n, u;
+	mat4 rot, trans;
+
+	n = normalize(vsub(p, l));
+	u = normalize(cross(v, n));
+	v = cross(n, u);
+
+	rot = setMat4(u.x, u.y, u.z, 0,
+                  v.x, v.y, v.z, 0,
+                  n.x, n.y, n.z, 0,
+                  0,   0,   0,   1);
+    
+	trans = T(-p.x, -p.y, -p.z);
+	mat4 m = Mult(rot, trans);
+	return m;
 }
 
 static void generate_normals(Mesh* m) {
