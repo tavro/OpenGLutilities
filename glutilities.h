@@ -25,87 +25,10 @@ extern "C" {
 #endif
 
 #include "constants.h"
+#include "vecutils.h"
 
 #include <stdlib.h>
 #include <GL/gl.h>
-
-/*
-
-TEMPORARY
-
-*/
-
-#include <stdio.h>
-#include <GL/gl.h>
-#include <math.h>
-
-typedef struct mat4 {
-	GLfloat m[16];
-#ifdef __cplusplus
-    mat4() {}
-	mat4(GLfloat x2) {
-		m[0] = x2; m[1] = 0; m[2] = 0; m[3] = 0;
-		m[4] = 0; m[5] = x2; m[6] = 0; m[7] = 0;
-		m[8] = 0; m[9] = 0; m[10] = x2; m[11] = 0;
-		m[12] = 0; m[13] = 0; m[14] = 0; m[15] = x2;
-	}
-	mat4(GLfloat p0, GLfloat p1, GLfloat p2, GLfloat p3,
-		GLfloat p4, GLfloat p5, GLfloat p6, GLfloat p7,
-		GLfloat p8, GLfloat p9, GLfloat p10, GLfloat p11, 
-		GLfloat p12, GLfloat p13, GLfloat p14, GLfloat p15) {
-	    m[0] = p0; m[1] = p1; m[2] = p2; m[3] = p3;
-		m[4] = p4; m[5] = p5; m[6] = p6; m[7] = p7;
-		m[8] = p8; m[9] = p9; m[10] = p10; m[11] = p11;
-		m[12] = p12; m[13] = p13; m[14] = p14; m[15] = p15;
-	}
-#endif
-} mat4;
-
-typedef struct vec3 {
-		union {GLfloat x; GLfloat r;};
-		union {GLfloat y; GLfloat g;};
-		union {GLfloat z; GLfloat b;};
-		
-        #ifdef __cplusplus
-            vec3() {}
-			vec3(GLfloat x2, GLfloat y2, GLfloat z2) : x(x2), y(y2), z(z2) {}
-			vec3(GLfloat x2) : x(x2), y(x2), z(x2) {}
-		#endif
-} vec3, *vec3Ptr;
-
-typedef struct vec2 {
-		union {GLfloat x; GLfloat s;};
-		union {GLfloat y; GLfloat t;};
-		
-		#ifdef __cplusplus
-            vec2() {}
-			vec2(GLfloat x2, GLfloat y2) : x(x2), y(y2) {}
-		#endif
-} vec2, *vec2Ptr;
-
-mat4 frustum(float left, float right, float bottom, float top, float znear, float zfar);
-vec3 cross(vec3 a, vec3 b);
-vec3 normalize(vec3 a);
-
-vec3 setv(GLfloat x, GLfloat y, GLfloat z);
-
-mat4 setMat4(GLfloat p0, GLfloat p1, GLfloat p2, GLfloat p3,
-				GLfloat p4, GLfloat p5, GLfloat p6, GLfloat p7,
-				GLfloat p8, GLfloat p9, GLfloat p10, GLfloat p11, 
-				GLfloat p12, GLfloat p13, GLfloat p14, GLfloat p15
-				);
-
-mat4 lookAtv(vec3 p, vec3 l, vec3 v);
-
-mat4 lookAt(GLfloat px, GLfloat py, GLfloat pz, 
-			GLfloat lx, GLfloat ly, GLfloat lz,
-			GLfloat vx, GLfloat vy, GLfloat vz);
-
-/*
-
-TEMPORARY END
-
-*/
 
 void glUtilitiesContextVersion(int major, int minor);
 
@@ -196,14 +119,25 @@ MODEL UTILITIES
 
 */
 
-// TODO: Materials
+typedef struct Material {
+	char newmtl[255];
+	
+	Vector3 Ka, Kd, Ks, Ke;
+
+	GLfloat Ns, Tr, d;
+
+	int illumination;
+	int texidKa, texidKd, texidKs, texidKe, texidNs, texid_d, texid_bump;
+
+	char map_Ka[255], map_Kd[255], map_Ks[255], map_Ke[255], map_Ns[255], map_d[255], map_bump[255];
+} Material, *MaterialPtr, **MaterialHandle;
 
 typedef struct {
-  vec2* texCoordArray;
+  Vector2* texCoordArray;
 
-  vec3* vertexArray;
-  vec3* normalArray;
-  vec3* colorArray;
+  Vector3* vertexArray;
+  Vector3* normalArray;
+  Vector3* colorArray;
   
   GLuint* indexArray;
   
@@ -215,7 +149,7 @@ typedef struct {
   GLuint vao;
   GLuint vb, ib, nb, tb; // VBOs
   
-  // TODO: Material *material;
+  Material *material;
 } Model;
 
 Model** glUtilitiesLoadModelSet(const char* n); // Multi-part Object
@@ -224,7 +158,7 @@ Model* glUtilitiesLoadModel(const char* n); // Single Object
 void glUtilitiesDrawWireframe(Model *m, GLuint program, const char* vertexVar, const char* normalVar, const char* textureVar);
 void glUtilitiesDrawModel(Model *m, GLuint program, const char* vertexVar, const char* normalVar, const char* textureVar);
 
-Model* glUtilitiesLoadModelData(vec3 *vertices, vec3 *normals, vec2 *texCoords, vec3 *colors, GLuint *indices, int numVertices, int numIndices);
+Model* glUtilitiesLoadModelData(Vector3 *vertices, Vector3 *normals, Vector2 *texCoords, Vector3 *colors, GLuint *indices, int numVertices, int numIndices);
 
 void glUtilitiesReloadModelData(Model *m);
 

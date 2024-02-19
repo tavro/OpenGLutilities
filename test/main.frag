@@ -16,14 +16,11 @@ uniform mat4 mdlMatrix;
 void main(void)
 {
 	vec3 lightDir = normalize(lightPos - surfacePos);
-	//How much the normal is pointing towards this light dir
 	float lampStrength = dot(normalize(inNormalFrag), lightDir);
 
 	lampStrength = max(0.01, lampStrength) *0.5f;
 
 	vec3 lightStrength = lampStrength * lightColor;
 
-	// outColor = vec4(surfacePos,0);
-	//  outColor = vec4(normalize(inNormalFrag),0);
-	outColor = texture(tex, texCoord/3) + vec4(lightStrength,0);
+	outColor = texture(tex, texCoord/3) + vec4(lightStrength, 0);
 }

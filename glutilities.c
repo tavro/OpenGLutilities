@@ -1227,8 +1227,8 @@ static int parse_int(char *line, int *pos, char *endc) {
 	return val;
 }
 
-static vec3 parse_vec3(char *line, int *pos) {
-	vec3 v;
+static Vector3 parse_vec3(char *line, int *pos) {
+	Vector3 v;
 	v.x = parse_float(line, pos);
 	v.y = parse_float(line, pos);
 	v.z = parse_float(line, pos);
@@ -1255,12 +1255,129 @@ void parse_line(FILE *fp, char *line) {
 	line[j] = 0;
 }
 
-// TODO: Materials
+static void dispose_material_list(Material **materials) {
+    if(materials) {
+        for(int i = 0; materials[i] != NULL; i++) {
+		    free(materials[i]);
+        }
+    }
+	free(materials);
+}
+
+static Material **parse_material(char *n) {
+    FILE *fp = fopen(n, "rb");
+	if (!fp) {
+		return NULL;
+    }
+
+    LINE_END = 0;
+    FILE_END = 0;
+
+    int pos;
+    char s[255];
+    char line[2048];
+    int materialCount = 0;
+    while(!FILE_END) {
+        parse_line(fp, line);
+        pos = 0;
+        parse_string(line, &pos, s);
+
+        if(strcmp(s, "newmtl") == 0) {
+            materialCount++;
+        }
+    }
+    rewind(fp);
+
+    Material **materials = (Material **)calloc(sizeof(MaterialPtr) * (materialCount + 1), 1);
+
+    materialCount = 0;
+	LINE_END = 0;
+	FILE_END = 0;
+
+    Material *m;
+    while(!FILE_END) {
+        parse_line(fp, line);
+        pos = 0;
+        parse_string(line, &pos, s);
+
+        if(strcmp(s, "newmtl") == 0) {
+            materialCount++;
+            materials[materialCount - 1] = (Material *)calloc(sizeof(Material), 1);
+			m = materials[materialCount - 1];
+			materials[materialCount] = NULL;
+
+            parse_string(line, &pos, m->newmtl);
+        }
+
+        if(m) {
+            if(strcmp(s, "Ka") == 0) {
+				m->Ka = parse_vec3(line, &pos);
+            }
+
+            if(strcmp(s, "Kd") == 0) {
+				m->Kd = parse_vec3(line, &pos);
+            }
+
+            if(strcmp(s, "Ks") == 0) {
+				m->Ks = parse_vec3(line, &pos);
+            }
+
+            if(strcmp(s, "Ke") == 0) {
+				m->Ke = parse_vec3(line, &pos);
+            }
+
+            if(strcmp(s, "Tr") == 0) {
+				m->Tr = parse_float(line, &pos);
+				m->d = 1 - m->Tr;
+            }
+
+            if(strcmp(s, "d") == 0) {
+				m->d = parse_float(line, &pos);
+				m->Tr = 1 - m->d;
+            }
+
+            if(strcmp(s, "illum") == 0) {
+				m->illumination = parse_int(line, &pos, NULL);
+            }
+
+            if(strcmp(s, "map_Ka") == 0) {
+				parse_string(line, &pos, m->map_Ka);
+            }
+
+            if(strcmp(s, "map_Kd") == 0) {
+				parse_string(line, &pos, m->map_Kd);
+            }
+
+            if(strcmp(s, "map_Ks") == 0) {
+				parse_string(line, &pos, m->map_Ks);
+            }
+
+            if(strcmp(s, "map_Ke") == 0) {
+				parse_string(line, &pos, m->map_Ke);
+            }
+
+            if(strcmp(s, "map_d") == 0) {
+				parse_string(line, &pos, m->map_d);
+            }
+
+            if(strcmp(s, "map_bump") == 0) {
+				parse_string(line, &pos, m->map_bump);
+            }
+
+            if(strcmp(s, "bump") == 0) {
+				parse_string(line, &pos, m->map_bump);
+            }
+        }
+    }
+    fclose(fp);
+
+    return materials;
+}
 
 typedef struct Mesh {
-	vec3	*vertexNormals;
-	vec2	*textureCoords;
-	vec3	*vertices;
+	Vector3	*vertexNormals;
+	Vector2	*textureCoords;
+	Vector3	*vertices;
 	
 	int		normalsCount;
     int		vertexCount;
@@ -1288,7 +1405,10 @@ static char HAS_POS_IDXS;
 static char HAS_TEX_IDXS;
 static char HAS_NORMAL_IDXS;
 
-// TODO: Material globals
+Material **MATERIALS;
+
+char **MATERIAL_NAME_LIST;
+char *MATERIAL_LIB_NAME = NULL;
 
 static char parse_obj(const char *n, MeshPtr mp) {
     int lastCoordCount = -1;
@@ -1315,7 +1435,7 @@ static char parse_obj(const char *n, MeshPtr mp) {
         char s[256];
 		parse_string(line, &pos, s);
 		if (strcmp(s, "v") == 0) {
-			vec3 v = parse_vec3(line, &pos);
+			Vector3 v = parse_vec3(line, &pos);
             if(mp->vertices) {
                 mp->vertices[VERT_COUNT++] = v;
             }
@@ -1325,7 +1445,7 @@ static char parse_obj(const char *n, MeshPtr mp) {
         }
 
 		if (strcmp(s, "vn") == 0) {
-			vec3 v = parse_vec3(line, &pos);
+			Vector3 v = parse_vec3(line, &pos);
             if(mp->vertexNormals) {
                 mp->vertexNormals[NORMAL_COUNT++] = v;
             }
@@ -1335,7 +1455,7 @@ static char parse_obj(const char *n, MeshPtr mp) {
         }
 
 		if (strcmp(s, "vt") == 0) {
-			vec3 v = parse_vec3(line, &pos);
+			Vector3 v = parse_vec3(line, &pos);
             if(mp->textureCoords) {
                 mp->textureCoords[TEX_COUNT].x = v.x;
                 mp->textureCoords[TEX_COUNT++].y = v.y;
@@ -1444,7 +1564,49 @@ static char parse_obj(const char *n, MeshPtr mp) {
             COORD_COUNT++;
         }
 
-        // TODO: Handle materials
+        if(strcmp(s, "mtllib") == 0) {
+			char libname[256];
+        	char tmp[255];
+			int index = 0;
+			for(unsigned int i = 0; i < strlen(n); i++) {
+				if(n[i] == '/') {
+					index = i;
+                }
+            }
+
+            if(index != 0) {
+				for(int i = 0; i < index + 1; i++) {
+					char ch = n[i];
+					strncat(tmp, &ch, 1);
+                }
+            }
+
+            parse_string(line, &pos, libname);
+			MATERIAL_LIB_NAME = (char *)malloc(strlen(libname) + 1);
+			strcpy(MATERIAL_LIB_NAME, libname);
+        }
+
+		if (strcmp(s, "usemtl") == 0) {
+            if (COORD_COUNT > 0) {
+				if (lastCoordCount != COORD_COUNT) {
+					mp->groupCount += 1;
+					if (mp->coordStarts)  {
+						mp->coordStarts[mp->groupCount] = COORD_COUNT;
+                    }
+					lastCoordCount = COORD_COUNT;
+				}
+				else {
+					printf("Ignored part!\n"); // TODO: Update this
+                }
+			}
+
+            if(MATERIAL_NAME_LIST) {
+                char matname[255];
+                parse_string(line, &pos, matname);
+                MATERIAL_NAME_LIST[mp->groupCount] = (char *)malloc(strlen(matname) + 1);
+                strcpy(MATERIAL_NAME_LIST[mp->groupCount], matname);
+            }
+        }
     }
 
     if(COORD_COUNT > lastCoordCount) {
@@ -1456,7 +1618,29 @@ static char parse_obj(const char *n, MeshPtr mp) {
 
     fclose(fp);
     
-    // TODO: Handle materials
+    if(MATERIAL_LIB_NAME) {
+		MATERIALS = parse_material(MATERIAL_LIB_NAME);
+    }
+
+    if(!MATERIALS) {
+	    if (strlen(n) > 4) {
+            char tryname[255];
+            strcpy(tryname, n);
+            tryname[strlen(tryname) - 4] = '_';
+            strcat(tryname, ".mtl");
+            MATERIALS = parse_material(tryname);
+        }
+    }
+
+    if(!MATERIALS) {
+	    if (strlen(n) > 4) {
+            char tmpname[255];
+            strcpy(tmpname, n);
+            tmpname[strlen(tmpname) - 4] = 0;
+            strcat(tmpname, ".mtl");
+            MATERIALS = parse_material(tmpname);
+        }
+    }
 
     return 0;
 }
@@ -1471,7 +1655,9 @@ static struct Mesh *load_obj(const char *n) {
     mp->coordStarts = NULL;
     mp->groupCount = 0;
 
-    // TODO: Materials
+    MATERIAL_NAME_LIST = NULL;
+	MATERIAL_LIB_NAME = NULL;
+	MATERIALS = NULL;
 
     NORMAL_COUNT = 0;
     COORD_COUNT = 0;
@@ -1482,15 +1668,15 @@ static struct Mesh *load_obj(const char *n) {
     parse_obj(n, mp);
 
     if(VERT_COUNT > 0) {
-        mp->vertices = (vec3 *)malloc(sizeof(vec3) * VERT_COUNT);
+        mp->vertices = (Vector3 *)malloc(sizeof(Vector3) * VERT_COUNT);
     }
 
     if(TEX_COUNT > 0) {
-        mp->textureCoords = (vec2 *)malloc(sizeof(vec2) * TEX_COUNT);
+        mp->textureCoords = (Vector2 *)malloc(sizeof(Vector2) * TEX_COUNT);
     }
 
     if(NORMAL_COUNT > 0) {
-        mp->vertexNormals = (vec3 *)malloc(sizeof(vec3) * NORMAL_COUNT);
+        mp->vertexNormals = (Vector3 *)malloc(sizeof(Vector3) * NORMAL_COUNT);
     }
 
     if(HAS_POS_IDXS) {
@@ -1505,7 +1691,7 @@ static struct Mesh *load_obj(const char *n) {
         mp->textureIndex = (int *)calloc(COORD_COUNT, sizeof(int));
     }
 
-    // TODO: Materials
+	MATERIAL_NAME_LIST = (char **)calloc(sizeof(char *) * (mp->groupCount + 1), 1);
     mp->coordStarts = (int *)calloc(sizeof(int) * (mp->groupCount + 2), 1);
 	mp->groupCount = 0;
 
@@ -1598,202 +1784,9 @@ void to_triangles(struct Mesh *mp) {
     }
 }
 
-/*
-
-TODO: Move temporary functions
-
-*/
-
-mat4 transpose(mat4 m) {
-	mat4 a;
-		
-	a.m[0] = m.m[0]; a.m[4] = m.m[1]; a.m[8] = m.m[2];      
-    a.m[12] = m.m[3];
-	a.m[1] = m.m[4]; a.m[5] = m.m[5]; a.m[9] = m.m[6];      
-    a.m[13] = m.m[7];
-	a.m[2] = m.m[8]; a.m[6] = m.m[9]; a.m[10] = m.m[10];    
-    a.m[14] = m.m[11];
-	a.m[3] = m.m[12]; a.m[7] = m.m[13]; a.m[11] = m.m[14];    
-    a.m[15] = m.m[15];
-		
-	return a;
-}
-
-mat4 frustum(float left, float right, float bottom, float top, float znear, float zfar) {
-    float temp, temp2, temp3, temp4;
-    mat4 matrix;
-    
-    temp = 2.0f * znear;
-    temp2 = right - left;
-    temp3 = top - bottom;
-    temp4 = zfar - znear;
-
-    matrix.m[0] = temp / temp2; // 2*near/(right-left)
-    matrix.m[1] = 0.0;
-    matrix.m[2] = 0.0;
-    matrix.m[3] = 0.0;
-    matrix.m[4] = 0.0;
-    matrix.m[5] = temp / temp3; // 2*near/(top - bottom)
-    matrix.m[6] = 0.0;
-    matrix.m[7] = 0.0;
-    matrix.m[8] = (right + left) / temp2; // A = r+l / r-l
-    matrix.m[9] = (top + bottom) / temp3; // B = t+b / t-b
-    matrix.m[10] = (-zfar - znear) / temp4; // C = -(f+n) / f-n
-    matrix.m[11] = -1.0;
-    matrix.m[12] = 0.0;
-    matrix.m[13] = 0.0;
-    matrix.m[14] = (-temp * zfar) / temp4; // D = -2fn / f-n
-    matrix.m[15] = 0.0;
-    
-    return transpose(matrix);
-}
-
-vec3 vsub(vec3 a, vec3 b) {
-	vec3 res;
-	res.x = a.x - b.x;
-	res.y = a.y - b.y;
-	res.z = a.z - b.z;
-	return res;
-}
-	
-vec3 vadd(vec3 a, vec3 b) {
-	vec3 res;
-	res.x = a.x + b.x;
-	res.y = a.y + b.y;
-	res.z = a.z + b.z;
-	return res;
-}
-
-vec3 scalar(vec3 a, GLfloat s) {
-	vec3 res;
-		
-	res.x = a.x * s;
-	res.y = a.y * s;
-	res.z = a.z * s;
-	
-	return res;
-}
-
-GLfloat dot(vec3 a, vec3 b) {
-	return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-vec3 cross(vec3 a, vec3 b) {
-	vec3 res;
-
-	res.x = a.y * b.z - a.z * b.y;
-	res.y = a.z * b.x - a.x * b.z;
-	res.z = a.x * b.y - a.y * b.x;
-
-	return res;
-}
-
-GLfloat norm(vec3 a) {
-	return (GLfloat)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-}
-
-vec3 normalize(vec3 a) {
-	GLfloat norm;
-	vec3 res;
-
-	norm = (GLfloat)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-	res.x = a.x / norm;
-	res.y = a.y / norm;
-	res.z = a.z / norm;
-	return res;
-}
-
-vec3 setv(GLfloat x, GLfloat y, GLfloat z) {
-	vec3 v;
-		
-	v.x = x;
-	v.y = y;
-	v.z = z;
-	return v;
-}
-
-mat4 setMat4(GLfloat p0, GLfloat p1, GLfloat p2, GLfloat p3,
-				GLfloat p4, GLfloat p5, GLfloat p6, GLfloat p7,
-				GLfloat p8, GLfloat p9, GLfloat p10, GLfloat p11, 
-				GLfloat p12, GLfloat p13, GLfloat p14, GLfloat p15
-				) {
-	mat4 m;
-	m.m[0] = p0;
-	m.m[1] = p1;
-	m.m[2] = p2;
-	m.m[3] = p3;
-	m.m[4] = p4;
-	m.m[5] = p5;
-	m.m[6] = p6;
-	m.m[7] = p7;
-	m.m[8] = p8;
-	m.m[9] = p9;
-	m.m[10] = p10;
-	m.m[11] = p11;
-	m.m[12] = p12;
-	m.m[13] = p13;
-	m.m[14] = p14;
-	m.m[15] = p15;
-	return m;
-}
-
-mat4 IdentityMatrix() {
-	mat4 m;
-	int i;
-
-	for (i = 0; i <= 15; i++)
-		m.m[i] = 0;
-	for (i = 0; i <= 3; i++)
-		m.m[i * 5] = 1; // 0,5,10,15
-	return m;
-}
-
-mat4 T(GLfloat tx, GLfloat ty, GLfloat tz) {
-	mat4 m;
-	m = IdentityMatrix();
-	m.m[3] = tx;
-	m.m[7] = ty;
-	m.m[11] = tz;
-	return m;
-}
-
-mat4 Mult(mat4 a, mat4 b) {
-	mat4 m;
-
-	int x, y;
-	for (x = 0; x <= 3; x++) {
-		for (y = 0; y <= 3; y++) {
-				m.m[y*4 + x] =	a.m[y*4+0] * b.m[0*4+x] +
-                a.m[y*4+1] * b.m[1*4+x] +
-				a.m[y*4+2] * b.m[2*4+x] +
-				a.m[y*4+3] * b.m[3*4+x];
-        }
-    }
-
-	return m;
-}
-
-mat4 lookAtv(vec3 p, vec3 l, vec3 v) {
-	vec3 n, u;
-	mat4 rot, trans;
-
-	n = normalize(vsub(p, l));
-	u = normalize(cross(v, n));
-	v = cross(n, u);
-
-	rot = setMat4(u.x, u.y, u.z, 0,
-                  v.x, v.y, v.z, 0,
-                  n.x, n.y, n.z, 0,
-                  0,   0,   0,   1);
-    
-	trans = T(-p.x, -p.y, -p.z);
-	mat4 m = Mult(rot, trans);
-	return m;
-}
-
 static void generate_normals(Mesh* m) {
     if(m->vertices && !m->vertexNormals) {
-        m->vertexNormals = (vec3 *)calloc(sizeof(vec3) * m->vertexCount, 1);
+        m->vertexNormals = (Vector3 *)calloc(sizeof(Vector3) * m->vertexCount, 1);
         m->normalsCount = m->vertexCount;
         m->normalsIndex = (int *)calloc(m->coordCount, sizeof(GLuint));
 		memcpy(m->normalsIndex, m->coordIndex, sizeof(GLuint) * m->coordCount);
@@ -1805,13 +1798,13 @@ static void generate_normals(Mesh* m) {
             int i1 = m->coordIndex[face * 3 + 1];
             int i2 = m->coordIndex[face * 3 + 2];
 
-            vec3 v0 = vsub(m->vertices[i1], m->vertices[i0]); // TODO: Implement vsub
-            vec3 v1 = vsub(m->vertices[i2], m->vertices[i0]);
-            vec3 v2 = vsub(m->vertices[i2], m->vertices[i1]);
+            Vector3 v0 = SubV3(m->vertices[i1], m->vertices[i0]);
+            Vector3 v1 = SubV3(m->vertices[i2], m->vertices[i0]);
+            Vector3 v2 = SubV3(m->vertices[i2], m->vertices[i1]);
 
-            float sqrLen0 = dot(v0, v0); // TODO: Implement dot
-			float sqrLen1 = dot(v1, v1);
-			float sqrLen2 = dot(v2, v2);
+            float sqrLen0 = Dot(v0, v0);
+			float sqrLen1 = Dot(v1, v1);
+			float sqrLen2 = Dot(v2, v2);
 
             float len0 = 1e-3f;
             if(sqrLen0 >= 1e-6f) {
@@ -1828,9 +1821,9 @@ static void generate_normals(Mesh* m) {
                 len2 = sqrt(sqrLen2);
             }
 
-            float influence0 =  dot(v0, v1) / (len0 * len1);
-			float influence1 = -dot(v0, v2) / (len0 * len2);
-			float influence2 =  dot(v1, v2) / (len1 * len2);
+            float influence0 =  Dot(v0, v1) / (len0 * len1);
+			float influence1 = -Dot(v0, v2) / (len0 * len2);
+			float influence2 =  Dot(v1, v2) / (len1 * len2);
 
             float angle0 = acos(influence0);
             if(influence0 >= 1.f) {
@@ -1856,16 +1849,16 @@ static void generate_normals(Mesh* m) {
                 angle2 = M_PI;
             }
 
-            vec3 normal = cross(v0, v1);
-			m->vertexNormals[i0] = vadd(scalar(normal, angle0), m->vertexNormals[i0]); // TODO: Implement vadd, scalar
-			m->vertexNormals[i1] = vadd(scalar(normal, angle1), m->vertexNormals[i1]);
-			m->vertexNormals[i2] = vadd(scalar(normal, angle2), m->vertexNormals[i2]);
+            Vector3 normal = Cross(v0, v1);
+			m->vertexNormals[i0] = AddV3(Scalar(normal, angle0), m->vertexNormals[i0]);
+			m->vertexNormals[i1] = AddV3(Scalar(normal, angle1), m->vertexNormals[i1]);
+			m->vertexNormals[i2] = AddV3(Scalar(normal, angle2), m->vertexNormals[i2]);
         }
 
         for(normalIndex = 0; normalIndex < m->normalsCount; normalIndex++) {
-			float len = norm(m->vertexNormals[normalIndex]);
+			float len = Norm(m->vertexNormals[normalIndex]);
             if(len > 0.01f) {
-				m->vertexNormals[normalIndex] = scalar(m->vertexNormals[normalIndex], 1 / len);
+				m->vertexNormals[normalIndex] = Scalar(m->vertexNormals[normalIndex], 1 / len);
             }
         }
     }
@@ -1956,7 +1949,25 @@ static Model* generate_model(Mesh* m) {
 
     free(indexHashMap);
 
-    // TODO: Materials
+	if (MATERIALS) {
+	    if (m->materialName) {
+		    for (int ii = 0; MATERIALS[ii] != NULL; ii++) {
+                Material *mtl = MATERIALS[ii];
+                if(strcmp(m->materialName, mtl->newmtl)) {
+				    model->material = (Material *)malloc(sizeof(Material));
+				    memcpy(model->material, mtl, sizeof(Material));
+
+                    strcpy(model->material->map_Ka, mtl->map_Ka);
+                    strcpy(model->material->map_Kd, mtl->map_Kd);
+                    strcpy(model->material->map_Ks, mtl->map_Ks);
+                    strcpy(model->material->map_Ke, mtl->map_Ke);
+                    strcpy(model->material->map_Ns, mtl->map_Ns);
+                    strcpy(model->material->map_d, mtl->map_d);
+                    strcpy(model->material->map_bump, mtl->map_bump);
+                }
+            }
+        }
+    }
 
     return model;
 }
@@ -2027,15 +2038,15 @@ Mesh **split_to_meshes(Mesh *m) {
 		mm[mi]->normalsIndex = (int *)malloc((to - from) * sizeof(int));
 
 		if (intVertexCount > 0) {
-			mm[mi]->vertices = (vec3 *)malloc(intVertexCount * sizeof(vec3));
+			mm[mi]->vertices = (Vector3 *)malloc(intVertexCount * sizeof(Vector3));
         }
 
 		if (intTexCount > 0) {
-			mm[mi]->textureCoords = (vec2 *)malloc(intTexCount * sizeof(vec2));
+			mm[mi]->textureCoords = (Vector2 *)malloc(intTexCount * sizeof(Vector2));
         }
 
 		if (intNormalsCount > 0) {
-			mm[mi]->vertexNormals = (vec3 *)malloc(intNormalsCount * sizeof(vec3));
+			mm[mi]->vertexNormals = (Vector3 *)malloc(intNormalsCount * sizeof(Vector3));
         }
 
         mm[mi]->vertexCount = intVertexCount;
@@ -2104,7 +2115,11 @@ Mesh **split_to_meshes(Mesh *m) {
         }
 
 		mm[mi]->coordCount = to - from;
-        // TODO: Materials
+        
+        if (MATERIAL_NAME_LIST) {
+			mm[mi]->materialName = MATERIAL_NAME_LIST[mi];
+			MATERIAL_NAME_LIST[mi] = NULL;
+		}
     }
 
     return mm;
@@ -2136,7 +2151,19 @@ static void dispose_mesh(Mesh *m) {
             free(m->textureIndex);
         }
 
-        // TODO: Materials
+        if (m->materialName) {
+			free(m->materialName);
+        }
+
+		if (MATERIAL_NAME_LIST) {
+			for (int i = 0; i < m->groupCount; i++) {
+				if (MATERIAL_NAME_LIST[i]) {
+					free(MATERIAL_NAME_LIST[i]);
+                }
+            }
+			free(MATERIAL_NAME_LIST);
+			MATERIAL_NAME_LIST = NULL;
+		}
 
         free(m);
     }
@@ -2353,9 +2380,11 @@ Model** glUtilitiesLoadModelSet(const char* n) {
     }
 
     free(mm);
+    dispose_material_list(MATERIALS);
     dispose_mesh(mesh);
     
-    // TODO: Materials
+    MATERIAL_NAME_LIST = NULL;
+	MATERIALS = NULL;
 
     for(i = 0; md[i] != NULL; i++) {
         generate_model_buffers(md[i]);
@@ -2365,7 +2394,7 @@ Model** glUtilitiesLoadModelSet(const char* n) {
     return md;
 }
 
-Model* glUtilitiesLoadModelData(vec3 *vertices, vec3 *normals, vec2 *texCoords, vec3 *colors, GLuint *indices, int numVertices, int numIndices) {
+Model* glUtilitiesLoadModelData(Vector3 *vertices, Vector3 *normals, Vector2 *texCoords, Vector3 *colors, GLuint *indices, int numVertices, int numIndices) {
 	Model* m = (Model *)malloc(sizeof(Model));
 	memset(m, 0, sizeof(Model));
     
@@ -2412,7 +2441,9 @@ void glUtilitiesDisposeModel(Model *m) {
 		glDeleteBuffers(1, &m->tb);
 		glDeleteVertexArrays(1, &m->vao);
 
-        // TODO: Materials
+        if (m->material) {
+			free(m->material);
+        }
     }
     
     free(m);
@@ -2431,160 +2462,61 @@ void glUtilitiesLoadTGASetMipmapping(bool active) {
 }
 
 bool glUtilitiesLoadTGATextureData(const char *n, TextureData *tex) {
-    GLuint i;
-    
     GLubyte uncompressedHeader[12] = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	GLubyte compressedHeader[12] = {0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	
+    GLubyte compressedHeader[12] = {0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     GLubyte uncompressedBWHeader[12] = {0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	GLubyte	compressedBWHeader[12] = {0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    GLubyte	compressedBWHeader[12] = {0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-	GLubyte header[12], halfHeader[6];
+    GLubyte header[12], halfHeader[6];
     
-    int err = 0;
-	FILE *file = fopen(n, "rb");
+    FILE *file = fopen(n, "rb");
     if(!file) {
-        err = 1;
+        printf("could not open file %s\n", n);
+        return false;
     }
-    else if(fread(header, 1, sizeof(header), file) != sizeof(header)) {
-        err = 2;
+
+    if(fread(header, 1, sizeof(header), file) != sizeof(header)) {
+        printf("could not read header of %s\n", n);
+        fclose(file);
+        return false;
     }
-    else if(
-        (memcmp(uncompressedHeader, header, sizeof(uncompressedHeader) - 4) != 0) &&
-		(memcmp(compressedHeader, header, sizeof(compressedHeader) - 4) != 0) &&
-		(memcmp(uncompressedBWHeader, header, sizeof(uncompressedHeader) - 4) != 0) &&
-		(memcmp(compressedBWHeader, header, sizeof(compressedHeader) - 4) != 0)
+
+    if(
+        memcmp(uncompressedHeader, header, sizeof(uncompressedHeader) - 4) != 0 &&
+        memcmp(compressedHeader, header, sizeof(compressedHeader) - 4) != 0 &&
+        memcmp(uncompressedBWHeader, header, sizeof(uncompressedBWHeader) - 4) != 0 &&
+        memcmp(compressedBWHeader, header, sizeof(compressedBWHeader) - 4) != 0
     ) {
-        err = 3;
-        for(i = 0; i < 12; i++) {
-			printf("%d ", header[i]);
-        }
-		printf("\n");
-    }
-    else if(fread(halfHeader, 1, sizeof(halfHeader), file) != sizeof(halfHeader)) {
-        err = 4;
+        printf("unsupported format in %s\n", n);
+        fclose(file);
+        return false;
     }
 
-    if(err != 0) {
-        switch(err) {
-            case 1:
-                printf("could not open file %s\n", n);
-                break;
-            case 2:
-                printf("could not read header of %s\n", n);
-                break;
-            case 3:
-                printf("unsupported format in %s\n", n);
-                break;
-            case 4:
-                printf("could not read file %s\n", n);
-                break;
-        }
-
-        if(file) {
-            fclose(file);
-        }
+    if(fread(halfHeader, 1, sizeof(halfHeader), file) != sizeof(halfHeader)) {
+        printf("could not read file %s\n", n);
+        fclose(file);
         return false;
     }
 
     tex->w = halfHeader[1] * 256 + halfHeader[0];
-	tex->h = halfHeader[3] * 256 + halfHeader[2];
+    tex->h = halfHeader[3] * 256 + halfHeader[2];
 
-    if(tex->w <= 0 || tex->h <= 0 || (halfHeader[4] != 24 && halfHeader[4] != 32 && halfHeader[4] != 8)) {
-		fclose(file);
-		return false;
+    tex->bpp = halfHeader[4];
+
+    if(tex->w <= 0 || tex->h <= 0 || (tex->bpp != 24 && tex->bpp != 32 && tex->bpp != 8)) {
+        fclose(file);
+        return false;
     }
 
-    tex->bpp = header[4];
-    GLuint bpp = tex->bpp / 8;
-    GLuint imgSize = tex->w * tex->h * bpp;
-    
-    long stepSize = tex->w * bpp;
-    long rowSize = tex->w * bpp;
+    GLuint imgSize = tex->w * tex->h * (tex->bpp / 8);
     
     tex->imageData = (GLubyte *)calloc(1, imgSize);
     if(!tex->imageData) {
         fclose(file);
-		return false;
+        return false;
     }
 
-    int b;
-    int row;
-    long step;
-    GLubyte *rowP;
-    char flipped = (halfHeader[5] & 32) != 0;
-	if (flipped) {
-		step = -stepSize;
-        rowP = &tex->imageData[imgSize - stepSize];
-		row = 0 + (tex->h - 1) * stepSize;
-    }
-    else {
-		step = stepSize;
-		rowP = &tex->imageData[0];
-		row = 0;
-    }
-
-    int limit;
-    long bytes;
-    GLubyte rle;
-    GLubyte pixelData[4];
-    if (header[2] == 2 || header[2] == 3) { // uncompressed
-		for (i = 0; i < tex->h; i++) {
-			bytes = fread(rowP, 1, rowSize, file);
-			rowP += step;
-			if (bytes != rowSize) {
-				free(tex->imageData);
-                fclose(file);
-                return false;
-            }
-        }
-    }
-    else {
-		i = row;
-		limit = row + rowSize;
-
-		do {
-            bytes = fread(&rle, 1, 1, file);
-			if(rle < 128) {
-				bytes = fread(&tex->imageData[i], 1, (rle + 1) * bpp, file);
-				i += bytes;
-				if (bytes == 0) {
-                    i = imgSize;
-                }
-            }
-            else {
-				bytes = fread(&pixelData, 1, bpp, file);
-
-                do {
-					for (b = 0; b < bpp; b++) {
-						tex->imageData[i + b] = pixelData[b];
-                    }
-					i += bpp;
-					rle = rle - 1;
-                }
-                while(rle > 127);
-            }
-
-            if(i >= limit) {
-                row = row + step;
-                limit = row + rowSize;
-				i = row;
-            }
-        }
-        while(i < imgSize);
-    }
-    
-    GLuint tmp;
-    if(bpp >= 3) { // not monochrome
-        for(i = 0; i < (int)(imgSize); i += bpp) {
-            // swap 1st & 3rd byte
-            tmp = tex->imageData[i];
-		    tex->imageData[i] = tex->imageData[i + 2];
-		    tex->imageData[i + 2] = tmp;
-        }
-    }
-	fclose (file);
-
+    fclose (file);
     return true;
 }
 

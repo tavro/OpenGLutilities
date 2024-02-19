@@ -1,4 +1,7 @@
+#define MAIN
+
 #include "../glutilities.h"
+#include "../vecutils.h"
 
 /*
 
@@ -8,22 +11,22 @@ DEMO PROGRAM
 
 GLuint program;
 
-mat4 projectionMatrix;
+Matrix4 projectionMatrix;
 
 GLuint tex1;
-TextureData ttex;
 
 Model *tm;
+TextureData ttex;
 
-vec3 *vArray;
+Vector3 *vArray;
 Model* GenerateTerrain(TextureData *tex) {
     int vCount = tex->w * tex->h;
 	int tCount = (tex->w - 1) * (tex->h - 1) * 2;
 
-	vArray = (vec3 *)malloc(sizeof(GLfloat) * 3 * vCount);
+	vArray = (Vector3 *)malloc(sizeof(GLfloat) * 3 * vCount);
 	
-    vec3 *nArray = (vec3 *)malloc(sizeof(GLfloat) * 3 * vCount);
-	vec2 *tcArray = (vec2 *)malloc(sizeof(GLfloat) * 2 * vCount);
+    Vector3 *nArray = (Vector3 *)malloc(sizeof(GLfloat) * 3 * vCount);
+	Vector2 *tcArray = (Vector2 *)malloc(sizeof(GLfloat) * 2 * vCount);
 	
     GLuint *iArray = (GLuint *)malloc(sizeof(GLuint) * tCount * 3);
 
@@ -41,10 +44,10 @@ Model* GenerateTerrain(TextureData *tex) {
     // Normal vectors
 	for (x = 0; x < tex->w - 1; x++) {
 		for (z = 0; z < tex->h - 1; z++) {
-			vec3 dir = vec3(0, 1, 0);
+			Vector3 dir = Vector3(0, 1, 0);
 
 			int i = (x + z * tex->w);
-			vec3 vertex = vec3(vArray[i].x, vArray[i].y, vArray[i].z);
+			Vector3 vertex = Vector3(vArray[i].x, vArray[i].y, vArray[i].z);
 
             // 8 neighbour vertices
 			for (int k = -1; k <= 1; k++) {
@@ -58,14 +61,14 @@ Model* GenerateTerrain(TextureData *tex) {
 						continue;
                     }
 
-					vec3 other = vec3(vArray[neighbouring].x, vArray[neighbouring].y, vArray[neighbouring].z);
-                    vec3 otherDir = normalize(setv(other.x-vertex.x, other.y-vertex.y, other.z-vertex.z));
-					vec3 cod = cross(otherDir, dir);
-                    dir = setv(cod.x+otherDir.x, cod.y+otherDir.y, cod.z+otherDir.z);
+					Vector3 other = {vArray[neighbouring].x, vArray[neighbouring].y, vArray[neighbouring].z};
+                    
+                    Vector3 otherDir = Normalize(SubV3(other, vertex));
+                    dir = AddV3(Cross(otherDir, dir), otherDir);
                 }
             }
 
-			dir = normalize(dir);
+			dir = Normalize(dir);
             nArray[(x + z * tex->w)].x = dir.x;
 			nArray[(x + z * tex->w)].y = dir.y;
 			nArray[(x + z * tex->w)].z = dir.z;
@@ -98,7 +101,7 @@ void initf(void) {
 
 	glUtilitiesReportError("GL INIT");
 
-	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, 0.2, 500.0);
+	projectionMatrix = Frustum(-0.1, 0.1, -0.1, 0.1, 0.2, 500.0);
 	
     program = glUtilitiesLoadShaders("test/main.vert", "test/main.frag");
 	glUseProgram(program);
@@ -115,17 +118,17 @@ void initf(void) {
 	glUtilitiesReportError("TERRAIN INIT");
 }
 
-vec2 camRot = vec2(0, 0);
-vec3 velocity = vec3(0, 0, 0);
-vec3 FORWARD;
+Vector2 camRot = Vector2(0, 0);
+Vector3 velocity = Vector3(0, 0, 0);
+Vector3 FORWARD;
 
 GLfloat lastFrameTime = 0.0;
 GLfloat deltaTime = 0.0;
 
-float SPEED = 25.0f;
+float SPEED = 35.0f;
 void keysf(unsigned char k, int x, int y) {
-    vec3 RIGHT = normalize(cross(FORWARD, {0, 1, 0}));
-	vec3 UP = normalize(cross(RIGHT, FORWARD));
+    Vector3 RIGHT = Normalize(Cross(FORWARD, {0, 1, 0}));
+	Vector3 UP = Normalize(Cross(RIGHT, FORWARD));
 
     // TODO: KeyIsDown does not seem to work
     // TODO: Turn into switch statement
@@ -147,33 +150,33 @@ void keysf(unsigned char k, int x, int y) {
     }
     
     if(k == 115) { // s
-        vec3 tmp = vec3(FORWARD.x * ds, FORWARD.y * ds, FORWARD.z * ds);
-		velocity = vec3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
+        Vector3 tmp = Vector3(FORWARD.x * ds, FORWARD.y * ds, FORWARD.z * ds);
+		velocity = Vector3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
     }
 
     if(k == 119) { // w
-		vec3 tmp = vec3(FORWARD.x * ds, FORWARD.y * ds, FORWARD.z * ds);
-		velocity = vec3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
+		Vector3 tmp = Vector3(FORWARD.x * ds, FORWARD.y * ds, FORWARD.z * ds);
+		velocity = Vector3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
     }
 
     if(k == 101) { // e
-		vec3 tmp = vec3(UP.x * ds, UP.y * ds, UP.z * ds);
-		velocity = vec3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
+		Vector3 tmp = Vector3(UP.x * ds, UP.y * ds, UP.z * ds);
+		velocity = Vector3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
     }
 
     if(k == 113) { // q
-        vec3 tmp = vec3(UP.x * ds, UP.y * ds, UP.z * ds);
-		velocity = vec3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
+        Vector3 tmp = Vector3(UP.x * ds, UP.y * ds, UP.z * ds);
+		velocity = Vector3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
     }
 
     if(k == 97) { // a
-        vec3 tmp = vec3(RIGHT.x * ds, RIGHT.y * ds, RIGHT.z * ds);
-		velocity = vec3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
+        Vector3 tmp = Vector3(RIGHT.x * ds, RIGHT.y * ds, RIGHT.z * ds);
+		velocity = Vector3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
     }
 
     if(k == 100) { // d
-        vec3 tmp = vec3(RIGHT.x * ds, RIGHT.y * ds, RIGHT.z * ds);
-		velocity = vec3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
+        Vector3 tmp = Vector3(RIGHT.x * ds, RIGHT.y * ds, RIGHT.z * ds);
+		velocity = Vector3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
     }
     //printf("%d\n", k);
 }
@@ -184,7 +187,7 @@ float lerp(float t, float a, float b) {
 
 float curr = 0;
 float getY(float x, float z, TextureData *tex) {
-	vec2 last = vec2((int)floor(x), (int)floor(z)); // last visited point
+	Vector2 last = Vector2((int)floor(x), (int)floor(z)); // last visited point
 
 	int other = (((x - last.x) + (z - last.y)) >= 1); // upper right triangle
 
@@ -214,28 +217,21 @@ void displayf(void) {
 	else if(camRot.y < -89) {
 		camRot.y = -89;
 	}
-	vec2 camRotRad = vec2(camRot.x * M_PI / 180, camRot.y * M_PI / 180); // convert to radians
+	Vector2 camRotRad = Vector2(camRot.x * M_PI / 180, camRot.y * M_PI / 180); // convert to radians
 
-	vec3 target;
+	Vector3 target;
 	target.x = cos(camRotRad.x) * cos(camRotRad.y);
 	target.y = sin(camRotRad.y);
 	target.z = sin(camRotRad.x) * cos(camRotRad.y);
-	vec3 direction = normalize(target);
+	Vector3 direction = Normalize(target);
 	FORWARD = direction;
 
     // TODO: Implement rest
-    mat4 worldToView = lookAtv(velocity, vec3(velocity.x + direction.x, velocity.y + direction.y, velocity.z + direction.z), {0, 1, 0});
+    Matrix4 worldToView = LookAtVector(velocity, AddV3(velocity, direction), {0, 1, 0});
  	glUniformMatrix4fv(glGetUniformLocation(program, "worldToView"), 1, GL_TRUE, worldToView.m);
 	
     // Identity Matrix
-    int idx;
-    mat4 modelView;
-    for(idx = 0; idx <= 15; idx++) {
-		modelView.m[idx] = 0;
-    }
-    for(idx = 0; idx <= 3; idx++) {
-		modelView.m[idx * 5] = 1;
-    }
+    Matrix4 modelView = IdentityMatrix();
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, modelView.m);
 	glBindTexture(GL_TEXTURE_2D, tex1);
@@ -252,8 +248,8 @@ void mousef(int b, int s, int x, int y) {
 
 int main(int argc, char *argv[]) {
     glUtilitiesInit(&argc, argv);
-    glUtilitiesContextVersion(3, 2);
     glUtilitiesDisplayMode(DOUBLE | DEPTH);
+    glUtilitiesContextVersion(3, 2);
     
     glUtilitiesWindowSize(600, 600);
     glUtilitiesCreateWindow("Test");
