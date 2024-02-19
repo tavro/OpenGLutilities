@@ -2461,63 +2461,157 @@ void glUtilitiesLoadTGASetMipmapping(bool active) {
     MIPMAP = active;
 }
 
-bool glUtilitiesLoadTGATextureData(const char *n, TextureData *tex) {
-    GLubyte uncompressedHeader[12] = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    GLubyte compressedHeader[12] = {0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    GLubyte uncompressedBWHeader[12] = {0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    GLubyte	compressedBWHeader[12] = {0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+bool glUtilitiesLoadTGATextureData(const char *filename, TextureData *texture) {
+	GLuint i;
+	GLubyte uncompressedheader[12] = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	GLubyte compressedheader[12] = {0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	GLubyte uncompressedbwheader[12] = {0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	GLubyte compressedbwheader[12] = {0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	GLubyte actualHeader[12];
+    GLubyte header[6];
 
-    GLubyte header[12], halfHeader[6];
-    
-    FILE *file = fopen(n, "rb");
-    if(!file) {
-        printf("could not open file %s\n", n);
-        return false;
+	GLuint bytesPerPixel;
+	GLuint imageSize;
+	GLuint temp;
+
+    GLubyte *rowP;
+	
+    long rowSize, stepSize, bytesRead;
+	long row, rowLimit;
+	
+    int err;
+    int b;
+	
+    GLubyte rle;
+	GLubyte pixelData[4];	
+	
+	char flipped;
+	long step;
+	
+    FILE *file = fopen(filename, "rb");
+	err = 0;
+
+	if (file == NULL) {
+        err = 1;
     }
-
-    if(fread(header, 1, sizeof(header), file) != sizeof(header)) {
-        printf("could not read header of %s\n", n);
-        fclose(file);
-        return false;
+	else if (fread(actualHeader, 1, sizeof(actualHeader), file) != sizeof(actualHeader)) {
+        err = 2;
     }
-
-    if(
-        memcmp(uncompressedHeader, header, sizeof(uncompressedHeader) - 4) != 0 &&
-        memcmp(compressedHeader, header, sizeof(compressedHeader) - 4) != 0 &&
-        memcmp(uncompressedBWHeader, header, sizeof(uncompressedBWHeader) - 4) != 0 &&
-        memcmp(compressedBWHeader, header, sizeof(compressedBWHeader) - 4) != 0
-    ) {
-        printf("unsupported format in %s\n", n);
-        fclose(file);
-        return false;
+	else if (
+				(memcmp(uncompressedheader, actualHeader, sizeof(uncompressedheader)-4) != 0) &&
+				(memcmp(compressedheader, actualHeader, sizeof(compressedheader)-4) != 0) &&
+				(memcmp(uncompressedbwheader, actualHeader, sizeof(uncompressedheader)-4) != 0) &&
+				(memcmp(compressedbwheader, actualHeader, sizeof(compressedheader)-4) != 0)
+			) {
+		err = 3; // Does The Header Match What We Want?
+		for (i = 0; i < 12; i++) {
+			printf("%d ", actualHeader[i]);
+        }
+		printf("\n");
+	}
+	else if (fread(header, 1, sizeof(header), file) != sizeof(header)) {
+        err = 4;
     }
+	
+	if (err != 0) {
+		switch (err) {
+			case 1: printf("could not open file %s\n", filename); break;
+			case 2: printf("could not read header of %s\n", filename); break;
+			case 3: printf("unsupported format in %s\n", filename); break;
+			case 4: printf("could not read file %s\n", filename); break;
+		}
+		
+		if(file == NULL) {
+			return false;
 
-    if(fread(halfHeader, 1, sizeof(halfHeader), file) != sizeof(halfHeader)) {
-        printf("could not read file %s\n", n);
-        fclose(file);
-        return false;
-    }
+        } 
+        else {
+			fclose(file);
+			return false;
+		}
+	}
 
-    tex->w = halfHeader[1] * 256 + halfHeader[0];
-    tex->h = halfHeader[3] * 256 + halfHeader[2];
+	texture->w  = header[1] * 256 + header[0];
+    texture->h = header[3] * 256 + header[2];
+	if (texture->w <= 0 || texture->h <= 0 || (header[4] != 24 && header[4] != 32 && header[4] != 8)) {
+		fclose(file);		// If Anything Failed, Close The File
+		return false;
+	}
+	flipped = (header[5] & 32) != 0;
 
-    tex->bpp = halfHeader[4];
+	texture->bpp = header[4];
+	bytesPerPixel = texture->bpp/8;
+	imageSize = texture->w * texture->h * bytesPerPixel;
+	rowSize	= texture->w * bytesPerPixel;
+	stepSize = texture->w * bytesPerPixel;
+	texture->imageData = (GLubyte *)calloc(1, imageSize);
+	if (texture->imageData == NULL) {
+		fclose(file);
+		return false;
+	}
 
-    if(tex->w <= 0 || tex->h <= 0 || (tex->bpp != 24 && tex->bpp != 32 && tex->bpp != 8)) {
-        fclose(file);
-        return false;
-    }
+	if (flipped) {
+		step = -stepSize;
+		rowP = &texture->imageData[imageSize - stepSize];
+		row = 0 + (texture->h -1) * stepSize;
+	}
+	else {
+		step = stepSize;
+		rowP = &texture->imageData[0];
+		row = 0;
+	}
 
-    GLuint imgSize = tex->w * tex->h * (tex->bpp / 8);
-    
-    tex->imageData = (GLubyte *)calloc(1, imgSize);
-    if(!tex->imageData) {
-        fclose(file);
-        return false;
-    }
+	if (actualHeader[2] == 2 || actualHeader[2] == 3) {
+		for (i = 0; i < texture->h; i++) {
+			bytesRead = fread(rowP, 1, rowSize, file);
+			rowP += step;
+			if (bytesRead != rowSize) {
+				free(texture->imageData);
+				fclose(file);
+				return false;
+			}
+		}
+	}
+	else {
+		i = row;
+		rowLimit = row + rowSize;
+		do {
+			bytesRead = fread(&rle, 1, 1, file);
+			if (rle < 128) {
+				bytesRead = fread(&texture->imageData[i], 1, (rle+1)*bytesPerPixel, file);
+				i += bytesRead;
+				if (bytesRead == 0) {
+					i = imageSize;
+                }
+			}
+			else {
+				bytesRead = fread(&pixelData, 1, bytesPerPixel, file);
+				do {
+					for (b = 0; b < bytesPerPixel; b++) {
+						texture->imageData[i+b] = pixelData[b];
+                    }
+					i += bytesPerPixel;
+					rle = rle - 1;
+				} while (rle > 127);
+			}
+			if (i >= rowLimit) {
+				row = row + step;
+				rowLimit = row + rowSize;
+				i = row;
+			}
+		} while (i < imageSize);
+	}
 
-    fclose (file);
-    return true;
+	if (bytesPerPixel >= 3) {
+        for (i = 0; i < (int)(imageSize); i += bytesPerPixel) {
+            temp = texture->imageData[i];
+            texture->imageData[i] = texture->imageData[i + 2];
+            texture->imageData[i + 2] = temp;
+        }
+    }	
+	fclose (file);
+
+	return true;
 }
 
 bool glUtilitiesLoadTGATexture(const char *n, TextureData *tex) {

@@ -36,7 +36,7 @@ Model* GenerateTerrain(TextureData *tex) {
 	for (x = 0; x < tex->w; x++) {
 		for (z = 0; z < tex->h; z++) {
             vArray[(x + z * tex->w)].x = x / 1.0;
-			vArray[(x + z * tex->w)].y = tex->imageData[(x + z * tex->w) * (tex->bpp / 8)] / 10.0;
+			vArray[(x + z * tex->w)].y = tex->imageData[(x + z * tex->w) * (tex->bpp / 8)] / 10.0; // THIS IS THE PROBLEM
 			vArray[(x + z * tex->w)].z = z / 1.0;
         }
     }
