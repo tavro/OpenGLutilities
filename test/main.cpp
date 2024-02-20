@@ -3,6 +3,82 @@
 #include "../glutilities.h"
 #include "../vecutils.h"
 
+#include <iostream>
+#include <pqxx/pqxx>
+#include <cstdlib>
+#include <ctime>
+
+void uploadMessage(const std::string& username, const std::string& message, float x, float y, float z) {
+    try {
+        pqxx::connection C("dbname=emmesen user=postgres password= hostaddr=127.0.0.1 port=5432");
+        if (C.is_open()) {
+            std::cout << "Opened database successfully: " << C.dbname() << std::endl;
+        } else {
+            std::cout << "Can't open database" << std::endl;
+            return;
+        }
+
+        pqxx::work W(C);
+        
+        std::string sql = "INSERT INTO messages (username, message, x_coord, y_coord, z_coord) VALUES (" +
+                          W.quote(username) + ", " +
+                          W.quote(message) + ", " +
+                          W.quote(x) + ", " +
+                          W.quote(y) + ", " +
+                          W.quote(z) + ");";
+
+        W.exec(sql);
+        W.commit();
+        std::cout << "Records created successfully" << std::endl;
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
+Vector3 *msgPosArr;
+void fetchAllMessages() {
+    // TODO: fetch amount of messages and store in variable (in this case the 6)
+	msgPosArr = (Vector3 *)malloc(sizeof(GLfloat) * 3 * 6);
+    try {
+        pqxx::connection C("dbname=emmesen user=postgres password= hostaddr=127.0.0.1 port=5432");
+        if (C.is_open()) {
+            std::cout << "Opened database successfully: " << C.dbname() << std::endl;
+        } else {
+            std::cout << "Can't open database" << std::endl;
+            return;
+        }
+
+        pqxx::nontransaction N(C);
+        
+        std::string sql = "SELECT id, username, message, x_coord, y_coord, z_coord, timestamp FROM messages;";
+
+        pqxx::result R( N.exec(sql) );
+
+        std::cout << "Fetching messages..." << std::endl;
+        
+        int i = 0;
+        for (auto c : R) {
+            std::cout << "ID = " << c[0].as<int>() << std::endl;
+            std::cout << "Username = " << c[1].as<std::string>() << std::endl;
+            std::cout << "Message = " << c[2].as<std::string>() << std::endl;
+            std::cout << "X Coordinate = " << c[3].as<float>() << std::endl;
+            std::cout << "Y Coordinate = " << c[4].as<float>() << std::endl;
+            std::cout << "Z Coordinate = " << c[5].as<float>() << std::endl;
+
+            msgPosArr[i].x = c[3].as<float>();
+            msgPosArr[i].y = c[4].as<float>();
+            msgPosArr[i].z = c[5].as<float>();
+
+            std::cout << "Timestamp = " << c[6].as<std::string>() << std::endl << std::endl;
+            i++;
+        }
+
+        std::cout << "Records fetched successfully" << std::endl;
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
 /*
 
 DEMO PROGRAM
@@ -13,9 +89,9 @@ GLuint program;
 
 Matrix4 projectionMatrix;
 
-GLuint tex1;
+GLuint tex1, tex2;
 
-Model *tm;
+Model *tm, *msg;
 TextureData ttex;
 
 Vector3 *vArray;
@@ -111,11 +187,14 @@ void initf(void) {
 	glUniformMatrix4fv(glGetUniformLocation(program, "projMatrix"), 1, GL_TRUE, projectionMatrix.m);
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 	glUtilitiesLoadTGATextureSimple("test/res/tex.tga", &tex1);
+	glUtilitiesLoadTGATextureSimple("test/res/tex3.tga", &tex2);
     
     glUtilitiesLoadTGATextureData("test/res/terrain.tga", &ttex);
 	tm = GenerateTerrain(&ttex);
 
 	glUtilitiesReportError("TERRAIN INIT");
+
+	msg = glUtilitiesLoadModel("test/res/star.obj");
 }
 
 Vector2 camRot = Vector2(0, 0);
@@ -125,6 +204,12 @@ Vector3 FORWARD;
 GLfloat lastFrameTime = 0.0;
 GLfloat deltaTime = 0.0;
 
+/*
+float randomFloat(float min, float max) {
+    return (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * (max - min) + min;
+}
+*/
+
 float SPEED = 35.0f;
 void keysf(unsigned char k, int x, int y) {
     Vector3 RIGHT = Normalize(Cross(FORWARD, {0, 1, 0}));
@@ -132,7 +217,7 @@ void keysf(unsigned char k, int x, int y) {
 
     // TODO: KeyIsDown does not seem to work
     // TODO: Turn into switch statement
-    float ds = deltaTime * SPEED;
+    float ds = deltaTime * SPEED * 4;
     if(k == 22) { // UP
 		camRot.y += ds;
     }
@@ -149,6 +234,7 @@ void keysf(unsigned char k, int x, int y) {
 		camRot.x -= ds;
     }
     
+    ds = deltaTime * SPEED;
     if(k == 115) { // s
         Vector3 tmp = Vector3(FORWARD.x * ds, FORWARD.y * ds, FORWARD.z * ds);
 		velocity = Vector3(velocity.x - tmp.x, velocity.y - tmp.y, velocity.z - tmp.z);
@@ -178,6 +264,10 @@ void keysf(unsigned char k, int x, int y) {
         Vector3 tmp = Vector3(RIGHT.x * ds, RIGHT.y * ds, RIGHT.z * ds);
 		velocity = Vector3(velocity.x + tmp.x, velocity.y + tmp.y, velocity.z + tmp.z);
     }
+
+    if(k == 32) { // space
+        uploadMessage("user", "empty", velocity.x, velocity.y, velocity.z);
+    }
     //printf("%d\n", k);
 }
 
@@ -201,6 +291,7 @@ float getY(float x, float z, TextureData *tex) {
 	return curr;
 }
 
+float PLAYER_HEIGHT = 5.0f;
 void displayf(void) {
     GLfloat currentTime = (GLfloat)glUtilitiesGet(ELAPSED_TIME);
     deltaTime = (currentTime - lastFrameTime) / 1000.0f;
@@ -227,16 +318,25 @@ void displayf(void) {
 	FORWARD = direction;
 
     // TODO: Implement rest
+    velocity.y = getY(velocity.x, velocity.z, &ttex) + PLAYER_HEIGHT;
     Matrix4 worldToView = LookAtVector(velocity, AddV3(velocity, direction), {0, 1, 0});
  	glUniformMatrix4fv(glGetUniformLocation(program, "worldToView"), 1, GL_TRUE, worldToView.m);
 	
     // Identity Matrix
     Matrix4 modelView = IdentityMatrix();
-
+	
 	glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, modelView.m);
 	glBindTexture(GL_TEXTURE_2D, tex1);
 	glUtilitiesDrawModel(tm, program, "inPosition", "inNormal", "inTexCoord");
 	
+	glBindTexture(GL_TEXTURE_2D, tex2);
+    for (int i = 0; i < 6; i++) {
+        Matrix4 modelView2 = Transform(msgPosArr[i].x, msgPosArr[i].y, msgPosArr[i].z);
+        modelView2 = MultM4(modelView2, RotateX(M_PI/2));
+        glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, modelView2.m);
+	    glUtilitiesDrawModel(msg, program, "inPosition", "inNormal", "inTexCoord");
+    }
+
 	glUtilitiesReportError("DISPLAY");
 
     glUtilitiesSwapBuffers();
@@ -259,6 +359,8 @@ int main(int argc, char *argv[]) {
     glUtilitiesMouseFunc(mousef);
 
     initf();
+
+    fetchAllMessages();
 
     glUtilitiesRepeatingTimerFunc(20);
     glUtilitiesMain();

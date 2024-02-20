@@ -11,4 +11,4 @@ author of MicroGLUT and examiner for university computer graphics course TSKB07.
 
 ## COMPILING INSTRUCTIONS
 
-gcc -Wall -o main test/main.cpp glutilities.c -DGL_GLEXT_PROTOTYPES -lXt -lX11 -lGL -lm
+gcc -Wall -o main test/main.cpp glutilities.c -DGL_GLEXT_PROTOTYPES -lXt -lX11 -lGL -lm -lpqxx -lpq -lstdc++

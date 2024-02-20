@@ -1864,112 +1864,128 @@ static void generate_normals(Mesh* m) {
     }
 }
 
-static Model* generate_model(Mesh* m) {
-    typedef struct {
-        int posIndex;
-        int texIndex;
-        int normalIndex;
-        int newIndex;
-    } IndexTriplet;
+// TODO: Clean up
+static Model* generate_model(Mesh* mesh)
+{
+	typedef struct
+	{
+		int positionIndex;
+		int normalIndex;
+		int texCoordIndex;
+		int newIndex;
+	} IndexTriplet;
 
-    int hashGap = 6;
-    int indexHMSize = (m->vertexCount * hashGap + m->coordCount);
-    
-    IndexTriplet *indexHashMap = (IndexTriplet *)malloc(sizeof(IndexTriplet) * indexHMSize);
-    
-    int numNewVertices = 0;
+	int hashGap = 6;
 
-    Model* model = (Model *)malloc(sizeof(Model));
+	int indexHashMapSize = (mesh->vertexCount * hashGap + mesh->coordCount);
+
+	IndexTriplet* indexHashMap = (IndexTriplet *)malloc(sizeof(IndexTriplet)
+							* indexHashMapSize);
+
+	int numNewVertices = 0;
+	int index;
+
+	int maxValue = 0;
+		
+	Model* model = (Model *)malloc(sizeof(Model));
 	memset(model, 0, sizeof(Model));
 
-    model->indexArray = (GLuint *)malloc(sizeof(GLuint) * m->coordCount);
-	model->numIndices = m->coordCount;
+	model->indexArray = (GLuint *)malloc(sizeof(GLuint) * mesh->coordCount);
+	model->numIndices = mesh->coordCount;
 
-	memset(indexHashMap, 0xff, sizeof(IndexTriplet) * indexHMSize);
+	memset(indexHashMap, 0xff, sizeof(IndexTriplet) * indexHashMapSize);
 
-    int i;
-    int max;
-    for(i = 0; i < m->coordCount; i++) {
-        IndexTriplet currVert = {-1, -1, -1, -1};
+	for (index = 0; index < mesh->coordCount; index++)
+	{
+		IndexTriplet currentVertex = { -1, -1, -1, -1 };
 		int insertPos = 0;
+		if (mesh->coordIndex)
+			currentVertex.positionIndex = mesh->coordIndex[index];
+		if (mesh->normalsIndex)
+			currentVertex.normalIndex = mesh->normalsIndex[index];
+		if (mesh->textureIndex)
+			currentVertex.texCoordIndex = mesh->textureIndex[index];
 
-        if(m->coordIndex) {
-			currVert.posIndex = m->coordIndex[i];
-        }
+		if (maxValue < currentVertex.texCoordIndex)
+			maxValue = currentVertex.texCoordIndex;
+ 
+		if (currentVertex.positionIndex >= 0)
+			insertPos = currentVertex.positionIndex * hashGap;
 
-        if(m->normalsIndex) {
-			currVert.normalIndex = m->normalsIndex[i];
-        }
-
-        if(m->textureIndex) {
-			currVert.texIndex = m->textureIndex[i];
-        }
-
-        if(max < currVert.texIndex) {
-			max = currVert.texIndex;
-        }
-
-		if (currVert.posIndex >= 0) {
-			insertPos = currVert.posIndex * hashGap;
-        }
-
-        while(true) {
-			if (indexHashMap[insertPos].newIndex == -1) {
-				currVert.newIndex = numNewVertices++;
-				indexHashMap[insertPos] = currVert;
-				break;
-            }
-            else if(indexHashMap[insertPos].posIndex == currVert.posIndex && indexHashMap[insertPos].normalIndex == currVert.normalIndex && indexHashMap[insertPos].texIndex == currVert.texIndex) {
-				currVert.newIndex = indexHashMap[insertPos].newIndex;
-                break;
-            }
-            else {
+		while (1)
+		{
+			if (indexHashMap[insertPos].newIndex == -1)
+				{
+					currentVertex.newIndex = numNewVertices++;
+					indexHashMap[insertPos] = currentVertex;
+					break;
+				}
+			else if (indexHashMap[insertPos].positionIndex
+				 == currentVertex.positionIndex
+				 && indexHashMap[insertPos].normalIndex
+				 == currentVertex.normalIndex
+				 && indexHashMap[insertPos].texCoordIndex
+				 == currentVertex.texCoordIndex)
+				{
+					currentVertex.newIndex = indexHashMap[insertPos].newIndex;
+					break;
+				}
+			else
 				insertPos++;
-            }
-        }
+		} 
 
-        model->indexArray[i] = currVert.newIndex;
-    }
+		model->indexArray[index] = currentVertex.newIndex;
+	}
 
-    for(i = 0; i < indexHMSize; i++) {
-		if (indexHashMap[i].newIndex != -1) {
-			if (m->vertices) {
-				model->vertexArray[indexHashMap[i].newIndex] = m->vertices[indexHashMap[i].posIndex];
-            }
+	if (mesh->vertices)
+		model->vertexArray = (Vector3 *)malloc(sizeof(Vector3) * numNewVertices);
+	if (mesh->vertexNormals)
+		model->normalArray = (Vector3 *)malloc(sizeof(Vector3) * numNewVertices);
+	if (mesh->textureCoords)
+		model->texCoordArray = (Vector2 *)malloc(sizeof(Vector2) * numNewVertices);
+	
+	model->numVertices = numNewVertices;
 
-            if (m->vertexNormals) {
-				model->normalArray[indexHashMap[i].newIndex] = m->vertexNormals[indexHashMap[i].normalIndex];
-            }
+	for (index = 0; index < indexHashMapSize; index++)
+	{
+		if (indexHashMap[index].newIndex != -1)
+		{
+			if (mesh->vertices)
+				model->vertexArray[indexHashMap[index].newIndex] = mesh->vertices[indexHashMap[index].positionIndex];
+			if (mesh->vertexNormals)
+			{
+				model->normalArray[indexHashMap[index].newIndex] = mesh->vertexNormals[indexHashMap[index].normalIndex];
+			}
+			if (mesh->textureCoords)
+				model->texCoordArray[indexHashMap[index].newIndex] = mesh->textureCoords[indexHashMap[index].texCoordIndex];
+		}
+	}
 
-            if (m->textureCoords) {
-				model->texCoordArray[indexHashMap[i].newIndex] = m->textureCoords[indexHashMap[i].texIndex];
-            }
-        }
-    }
+	free(indexHashMap);
 
-    free(indexHashMap);
+	// If there is a material set, match materials to parts
+	if (MATERIALS != NULL)
+	if (mesh->materialName != NULL)
+		for (int ii = 0; MATERIALS[ii] != NULL; ii++)
+		{
+			Material *mtl = MATERIALS[ii];
+			if (strcmp(mesh->materialName, mtl->newmtl) == 0)
+			{
+				// Copy mtl to model!
+				model->material = (Material *)malloc(sizeof(Material));
+				memcpy(model->material, mtl, sizeof(Material));
 
-	if (MATERIALS) {
-	    if (m->materialName) {
-		    for (int ii = 0; MATERIALS[ii] != NULL; ii++) {
-                Material *mtl = MATERIALS[ii];
-                if(strcmp(m->materialName, mtl->newmtl)) {
-				    model->material = (Material *)malloc(sizeof(Material));
-				    memcpy(model->material, mtl, sizeof(Material));
+				strcpy(model->material->map_Ka, mtl->map_Ka);
+				strcpy(model->material->map_Kd, mtl->map_Kd);
+				strcpy(model->material->map_Ks, mtl->map_Ks);
+				strcpy(model->material->map_Ke, mtl->map_Ke);
+				strcpy(model->material->map_Ns, mtl->map_Ns);
+				strcpy(model->material->map_d, mtl->map_d);
+				strcpy(model->material->map_bump, mtl->map_bump);
+			}
+		}
 
-                    strcpy(model->material->map_Ka, mtl->map_Ka);
-                    strcpy(model->material->map_Kd, mtl->map_Kd);
-                    strcpy(model->material->map_Ks, mtl->map_Ks);
-                    strcpy(model->material->map_Ke, mtl->map_Ke);
-                    strcpy(model->material->map_Ns, mtl->map_Ns);
-                    strcpy(model->material->map_d, mtl->map_d);
-                    strcpy(model->material->map_bump, mtl->map_bump);
-                }
-            }
-        }
-    }
-
-    return model;
+	return model;
 }
 
 Mesh **split_to_meshes(Mesh *m) {
@@ -2353,6 +2369,7 @@ static void generate_model_buffers(Model *m) {
 Model* glUtilitiesLoadModel(const char* n) {
 	Mesh *mesh = load_obj(n);
     to_triangles(mesh);
+
     generate_normals(mesh);
     
     Model *model = generate_model(mesh);
