@@ -195,6 +195,65 @@ int glUtilitiesSaveTGAData(char	*n, short int w, short int h, unsigned char pixe
 void glUtilitiesSaveTGA(TextureData *tex, char *n);
 void glUtilitiesSaveTGAFramebuffer(char *n, GLint x, GLint y, GLint w, GLint h);
 
+/*
+
+GUI UTILITIES
+
+*/
+
+typedef void (*NoArgProcPtr)();
+
+int glUtilitiesSlider(int x, int y, int w, float *var, float min, float max);
+int glUtilitiesColorBox(int x, int y, float *r, float *g, float *b);
+int glUtilitiesColorDrop(int x, int y, float *r, float *g, float *b);
+
+void glUtilitiesSliderColorGroup(int x, int y, int w, float *r, float *g, float *b);
+
+int glUtilitiesCheckBox(int x, int y, const char *s, int *var);
+int glUtilitiesStaticString(int x, int y, const char *s);
+int glUtilitiesDynamicString(int x, int y, char *s);
+int glUtilitiesDisplayInt(int x, int y, const char *s, int *variable);
+int glUtilitiesDisplayFloat(int x, int y, const char *s, float *variable);
+int glUtilitiesRadio(int x, int y, const char *s, int *variable, int index);
+int glUtilitiesButton(int x, int y, const char *s, NoArgProcPtr callback);
+
+void glUtilitiesSliderV3Group(int x, int y, int w, float *v, float min, float max);
+
+int glUtilitiesMenu(int x, int y, const char *s);
+int glUtilitiesMenuItem(const char *s, NoArgProcPtr callback);
+
+int glUtilitiesColorClicker(int x, int y, float r, float g, float b, float *dr, float *dg, float *db);
+int glUtilitiesSmallColorClicker(int x, int y, float r, float g, float b, float *dr, float *dg, float *db);
+
+void glUtilitiesColorPalette(int x, int y, float *dr, float *dg, float *db);
+void glUtilitiesSmallColorPalette(int x, int y, float *dr, float *dg, float *db);
+
+int glUtilitiesLeftStepper(int x, int y, int *var);
+int glUtilitiesRightStepper(int x, int y, int *var);
+
+void glUtilitiesSteppers(int x, int y, int *var);
+
+static int glUtilitiesCreateItem(int x, int y);
+void glUtilitiesRemoveItem(int i);
+
+void glUtilitiesDrawGUI();
+
+int glUtilitiesMouseGUI(int state, int x, int y);
+int glUtilitiesMouseDragGUI(int x, int y);
+
+void glUtilitiesLoadFont(unsigned char *data, float charW, float charH, int imgW, int imgH, int space);
+
+void glUtilitiesSetFrameColor(float r, float g, float b);
+void glUtilitiesSetFillColor(float r, float g, float b);
+void glUtilitiesSetSliderFillColor(int ID, float r, float g, float b);
+void glUtilitiesSetSliderDefaultFillColor(float r, float g, float b);
+void glUtilitiesSetBackgroundColor(float r, float g, float b, float a);
+void glUtilitiesSetBackgroundBorder(int b);
+void glUtilitiesSetTextColor(float r, float g, float b);
+void glUtilitiesSetPosition(int x, int y);
+void glUtilitiesSetSpacing(int s);
+void glUtilitiesSetScale(int s);
+
 #ifdef __cplusplus
 }
 #endif

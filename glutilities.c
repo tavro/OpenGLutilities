@@ -21,6 +21,7 @@ author of MicroGLUT and examiner for university computer graphics course TSKB07.
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <GL/gl.h>
 #include <stdio.h>
 #include <math.h>
@@ -2731,3 +2732,1090 @@ void glUtilitiesSaveTGAFramebuffer(char *n, GLint x, GLint y, GLint w, GLint h) 
     err = glUtilitiesSaveTGAData(n, w, h, 3 * 8, (unsigned char *)buffer);
     printf("(glUtilities) SaveTGAFramebuffer returned: %d\n", err);
 }
+
+/*
+
+GUI Utilities
+
+*/
+
+#define mscale 1
+
+static GLubyte UPPERCASE[][16] = {
+    {0, 0, 0, 0, 0, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xc3, 0xc3, 0xc3, 0x66, 0x3c, 0x18}, 
+    {0, 0, 0, 0, 0, 0xfe, 0xc7, 0xc3, 0xc3, 0xc7, 0xfe, 0xc7, 0xc3, 0xc3, 0xc7, 0xfe}, 
+    {0, 0, 0, 0, 0, 0x7e, 0xe7, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xe7, 0x7e}, 
+    {0, 0, 0, 0, 0, 0xfc, 0xce, 0xc7, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc7, 0xce, 0xfc}, 
+    {0, 0, 0, 0, 0, 0xff, 0xc0, 0xc0, 0xc0, 0xc0, 0xfc, 0xc0, 0xc0, 0xc0, 0xc0, 0xff}, 
+    {0, 0, 0, 0, 0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xfc, 0xc0, 0xc0, 0xc0, 0xff}, 
+    {0, 0, 0, 0, 0, 0x7e, 0xe7, 0xc3, 0xc3, 0xcf, 0xc0, 0xc0, 0xc0, 0xc0, 0xe7, 0x7e}, 
+    {0, 0, 0, 0, 0, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3}, 
+    {0, 0, 0, 0, 0, 0x7e, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7e}, 
+    {0, 0, 0, 0, 0, 0x7c, 0xee, 0xc6, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06}, 
+    {0, 0, 0, 0, 0, 0xc3, 0xc6, 0xcc, 0xd8, 0xf0, 0xe0, 0xf0, 0xd8, 0xcc, 0xc6, 0xc3}, 
+    {0, 0, 0, 0, 0, 0xff, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0}, 
+    {0, 0, 0, 0, 0, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xdb, 0xff, 0xff, 0xe7, 0xc3}, 
+    {0, 0, 0, 0, 0, 0xc7, 0xc7, 0xcf, 0xcf, 0xdf, 0xdb, 0xfb, 0xf3, 0xf3, 0xe3, 0xe3}, 
+    {0, 0, 0, 0, 0, 0x7e, 0xe7, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xe7, 0x7e}, 
+    {0, 0, 0, 0, 0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xfe, 0xc7, 0xc3, 0xc3, 0xc7, 0xfe}, 
+    {0, 0, 0, 0, 0, 0x3f, 0x6e, 0xdf, 0xdb, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x66, 0x3c}, 
+    {0, 0, 0, 0, 0, 0xc3, 0xc6, 0xcc, 0xd8, 0xf0, 0xfe, 0xc7, 0xc3, 0xc3, 0xc7, 0xfe}, 
+    {0, 0, 0, 0, 0, 0x7e, 0xe7, 0x03, 0x03, 0x07, 0x7e, 0xe0, 0xc0, 0xc0, 0xe7, 0x7e}, 
+    {0, 0, 0, 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0xff}, 
+    {0, 0, 0, 0, 0, 0x7e, 0xe7, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3}, 
+    {0, 0, 0, 0, 0, 0x18, 0x3c, 0x3c, 0x66, 0x66, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3}, 
+    {0, 0, 0, 0, 0, 0xc3, 0xe7, 0xff, 0xff, 0xdb, 0xdb, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3}, 
+    {0, 0, 0, 0, 0, 0xc3, 0x66, 0x66, 0x3c, 0x3c, 0x18, 0x3c, 0x3c, 0x66, 0x66, 0xc3}, 
+    {0, 0, 0, 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x3c, 0x66, 0x66, 0xc3}, 
+    {0, 0, 0, 0, 0, 0xff, 0xc0, 0xc0, 0x60, 0x30, 0x7e, 0x0c, 0x06, 0x03, 0x03, 0xff}
+};
+
+static GLubyte LOWERCASE[][16] = {
+    {0, 0, 0, 0x00, 0x00, 0x7d, 0xc3, 0xc3, 0xc3, 0x7f, 0x03, 0x7e, 0x00, 0x00, 0x00, 0x00}, // a
+    {0, 0, 0, 0x00, 0x00, 0xfe, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfe, 0xc0, 0xc0, 0xc0, 0xc0}, // b
+    {0, 0, 0, 0x00, 0x00, 0x7f, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x7f, 0x00, 0x00, 0x00, 0x00}, // c
+    {0, 0, 0, 0x00, 0x00, 0x7f, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x7f, 0x03, 0x03, 0x03, 0x03}, // d
+    {0, 0, 0, 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xfe, 0xc3, 0xc3, 0x7e, 0x00, 0x00, 0x00, 0x00}, // e
+    {0, 0, 0, 0x00, 0x00, 0x3c, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7e, 0x18, 0x18, 0x18, 0x0e}, // f
+    {0, 0, 0, 0x7f, 0x03, 0x7f, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x7e, 0x00, 0x00, 0x00, 0x00}, // g
+    {0, 0, 0, 0x00, 0x00, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfe, 0xc0, 0xc0, 0xc0, 0xc0}, // h
+    {0, 0, 0, 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00}, // i
+    {0, 0, 0, 0x70, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00}, // j
+    {0, 0, 0, 0x00, 0x00, 0xc3, 0xc7, 0xce, 0xfc, 0xfe, 0xc7, 0xc3, 0xc0, 0xc0, 0xc0, 0xc0}, // k
+    {0, 0, 0, 0x00, 0x00, 0x0c, 0x1c, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18}, // l
+    {0, 0, 0, 0x00, 0x00, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xfe, 0x00, 0x00, 0x00, 0x00}, // m
+    {0, 0, 0, 0x00, 0x00, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfe, 0x00, 0x00, 0x00, 0x00}, // n
+    {0, 0, 0, 0x00, 0x00, 0x7e, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x7e, 0x00, 0x00, 0x00, 0x00}, // o
+    {0, 0, 0, 0xc0, 0xc0, 0xfe, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfe, 0x00, 0x00, 0x00, 0x00}, // p
+    {0, 0, 0, 0x03, 0x03, 0x7f, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x7f, 0x00, 0x00, 0x00, 0x00}, // q
+    {0, 0, 0, 0x00, 0x00, 0xc0, 0xc0, 0xc0, 0xc0, 0xe0, 0xf0, 0xdf, 0x00, 0x00, 0x00, 0x00}, // r
+    {0, 0, 0, 0x00, 0x00, 0xfe, 0x03, 0x03, 0x7e, 0xc0, 0xc0, 0x7f, 0x00, 0x00, 0x00, 0x00}, // s
+    {0, 0, 0, 0x00, 0x00, 0x0e, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7e, 0x18, 0x18, 0x18, 0x18}, // t
+    {0, 0, 0, 0x00, 0x00, 0x7f, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x00, 0x00, 0x00, 0x00}, // u
+    {0, 0, 0, 0x00, 0x00, 0x18, 0x3c, 0x66, 0x66, 0xc3, 0xc3, 0xc3, 0x00, 0x00, 0x00, 0x00}, // v
+    {0, 0, 0, 0x00, 0x00, 0x66, 0x7e, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0x00, 0x00, 0x00, 0x00}, // w
+    {0, 0, 0, 0x00, 0x00, 0xc3, 0xe7, 0x3c, 0x18, 0x3c, 0xe7, 0xc3, 0x00, 0x00, 0x00, 0x00}, // x
+    {0, 0, 0, 0x7f, 0x03, 0x7f, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0x00, 0x00, 0x00, 0x00}, // y
+    {0, 0, 0, 0x00, 0x00, 0xff, 0xc0, 0x70, 0x1c, 0x06, 0x03, 0xff, 0x00, 0x00, 0x00, 0x00}, // z
+};
+
+static GLubyte NUMLET[][16] = {
+    {0, 0, 0, 0, 0, 0x3c, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3c}, // 0
+    {0, 0, 0, 0, 0, 0x3c, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x78, 0x38, 0x18}, // 1
+    {0, 0, 0, 0, 0, 0x7e, 0x60, 0x60, 0x60, 0x60, 0x3c, 0x06, 0x06, 0x66, 0x66, 0x3c}, // 2
+    {0, 0, 0, 0, 0, 0x3c, 0x66, 0x06, 0x06, 0x06, 0x1c, 0x06, 0x06, 0x06, 0x66, 0x3c}, // 3
+    {0, 0, 0, 0, 0, 0x06, 0x06, 0x06, 0x06, 0x06, 0x7f, 0x66, 0x36, 0x1e, 0x0e, 0x06}, // 4
+    {0, 0, 0, 0, 0, 0x3c, 0x66, 0x06, 0x06, 0x06, 0x7c, 0x60, 0x60, 0x60, 0x60, 0x7e}, // 5
+    {0, 0, 0, 0, 0, 0x3c, 0x66, 0x66, 0x66, 0x66, 0x66, 0x7c, 0x60, 0x60, 0x66, 0x3c}, // 6
+    {0, 0, 0, 0, 0, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x1f, 0x06, 0x06, 0x06, 0x06, 0x7e}, // 7
+    {0, 0, 0, 0, 0, 0x3c, 0x66, 0x66, 0x66, 0x66, 0x3c, 0x66, 0x66, 0x66, 0x66, 0x3c}, // 8
+    {0, 0, 0, 0, 0, 0x3c, 0x66, 0x06, 0x06, 0x06, 0x3e, 0x66, 0x66, 0x66, 0x66, 0x3c}, // 9
+    {0, 0, 0, 0, 0, 0x00, 0x18, 0x18, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00}, // :
+    {0, 0, 0, 0, 0, 0x30, 0x18, 0x18, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00}, // ;
+    {0, 0, 0, 0, 0, 0x06, 0x1c, 0x30, 0x60, 0x30, 0x1c, 0x06, 0x00, 0x00, 0x00, 0x00}, // <
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x00, 0x00, 0x00}, // =
+    {0, 0, 0, 0, 0, 0x60, 0x38, 0x0c, 0x06, 0x0c, 0x38, 0x60, 0x00, 0x00, 0x00, 0x00}, // >
+    {0, 0, 0, 0, 0, 0x18, 0x18, 0x00, 0x18, 0x18, 0x18, 0x0c, 0x06, 0x06, 0x66, 0x3c}, // ?
+};
+
+static GLubyte SPECIAL[][16] = {
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // space
+    {0, 0, 0, 0, 0, 0x18, 0x18, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18}, // !
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x24, 0x00, 0x00}, // "
+    {0, 0, 0, 0, 0, 0x24, 0x24, 0x7e, 0x7e, 0x24, 0x7e, 0x7e, 0x24, 0x24, 0x00, 0x00}, // #
+    {0, 0, 0, 0, 0, 0x18, 0x3c, 0x5a, 0x5a, 0x1a, 0x3c, 0x58, 0x58, 0x5a, 0x3c, 0x18}, // $
+    {0, 0, 0, 0, 0, 0x44, 0x4a, 0x6a, 0x24, 0x30, 0x18, 0x0c, 0x24, 0x56, 0x52, 0x22}, // %
+    {0, 0, 0, 0, 0, 0x79, 0xcf, 0xc6, 0xcf, 0x79, 0x70, 0x78, 0xcc, 0xcc, 0xcc, 0x78}, // &
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x08, 0x18, 0x00, 0x00}, // '
+    {0, 0, 0, 0, 0, 0x0c, 0x18, 0x18, 0x30, 0x30, 0x30, 0x30, 0x30, 0x18, 0x18, 0x0c}, // (
+    {0, 0, 0, 0, 0, 0x30, 0x18, 0x18, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x18, 0x18, 0x30}, // )
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x10, 0x54, 0x38, 0x54, 0x10, 0x00, 0x00, 0x00, 0x00}, // *
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x10, 0x10, 0x7c, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00}, // +
+    {0, 0, 0, 0, 0x30, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // ,
+    {0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // -
+    {0, 0, 0, 0, 0, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // .
+    {0, 0, 0, 0, 0, 0x60, 0x60, 0x30, 0x30, 0x18, 0x18, 0x18, 0x0c, 0x0c, 0x06, 0x06}, // /
+};
+
+static GLubyte GUI_SHAPES[][16] = { // inline 16x8 bitmaps
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, // small box
+    { 0xFF, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0xFF}, // bigger box
+    { 0xFF, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0xFF}, // bigger box
+    { 0xFF, 0xE0, 0xF0, 0xB8, 0x9C, 0x8E, 0x87, 0x83, 0x83, 0x87, 0x8E, 0x9C, 0xB8, 0xF0, 0xE0, 0xFF}, // bb left check
+    { 0xFF, 0x07, 0x0F, 0x1D, 0x39, 0x71, 0xE1, 0xC1, 0xC1, 0xE1, 0x71, 0x39, 0x1D, 0x0F, 0x07, 0xFF}, // bn right check
+    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, // bigger inside left
+    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, // bigger inside right
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00}, // slider bar middle
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7F, 0x80, 0x80, 0x80, 0x7F, 0x00, 0x00, 0x00, 0x00}, // slider bar left end
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x01, 0x01, 0x01, 0xFE, 0x00, 0x00, 0x00, 0x00}, // slider bar right end
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, // slider bar inside
+    { 0x07, 0x18, 0x20, 0x40, 0x40, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x40, 0x40, 0x20, 0x18, 0x07}, // circle left
+    { 0xE0, 0x18, 0x04, 0x02, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x04, 0x18, 0xE0}, // circle right
+    { 0x00, 0x07, 0x1F, 0x3F, 0x3F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x3F, 0x3F, 0x1F, 0x07, 0x00}, // circle left inside
+    { 0x00, 0xE0, 0xF8, 0xFC, 0xFC, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFC, 0xFC, 0xF8, 0xE0, 0x00}, // circle right inside
+    { 0x00, 0x00, 0x03, 0x0F, 0x1F, 0x1F, 0x3F, 0x3F, 0x3F, 0x3F, 0x1F, 0x1F, 0x0F, 0x03, 0x00, 0x00}, // circle left spot
+    { 0x00, 0x00, 0xC0, 0xF0, 0xF8, 0xF8, 0xFC, 0xFC, 0xFC, 0xFC, 0xF8, 0xF8, 0xF0, 0xC0, 0x00, 0x00}, // circle right spot
+    { 0x00, 0x00, 0x00, 0x00, 0x3C, 0x42, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x42, 0x3C, 0x00}, // thumb
+    { 0x00, 0x00, 0x00, 0x00, 0x3C, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x3C, 0x00, 0x00}, // thumb inside
+    { 0x07, 0x18, 0x20, 0x40, 0x40, 0x80, 0x80, 0x80, 0x40, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01}, // drop left
+    { 0xE0, 0x18, 0x04, 0x02, 0x02, 0x01, 0x01, 0x01, 0x02, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}, // drop right
+    { 0x00, 0x07, 0x1F, 0x3F, 0x3F, 0x7F, 0x7F, 0x7F, 0x3F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01, 0x00}, // drop left inside
+    { 0x00, 0xE0, 0xF8, 0xFC, 0xFC, 0xFE, 0xFE, 0xFE, 0xFC, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80, 0x00}, // drop right inside
+    { 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF}, // top + bottom - combine with circle for a button
+    { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00}, // top + bottom inside
+    { 0x80, 0xC0, 0xE0, 0xB0, 0x98, 0x8C, 0x86, 0x83, 0x83, 0x86, 0x8C, 0x98, 0xB0, 0xE0, 0xC0, 0x80}, // step right
+    { 0x01, 0x03, 0x07, 0x0D, 0x19, 0x31, 0x61, 0xC1, 0xC1, 0x61, 0x31, 0x19, 0x0D, 0x07, 0x03, 0x01}, // step left
+    { 0x00, 0x00, 0x00, 0x40, 0x60, 0x70, 0x78, 0x7C, 0x7C, 0x78, 0x70, 0x60, 0x40, 0x00, 0x00, 0x00}, // step right inside
+    { 0x00, 0x00, 0x00, 0x02, 0x06, 0x0E, 0x1E, 0x3E, 0x3E, 0x1E, 0x0E, 0x06, 0x02, 0x00, 0x00, 0x00}, // step left inside
+};
+
+enum {
+	SMALL_BOX = 128,
+	BIG_BOX_LEFT, BIG_BOX_RIGHT, BIG_BOX_LEFT_CHECKED, BIG_BOX_RIGHT_CHECKED, BIG_BOX_LEFT_INSIDE, BIG_BOX_RIGHT_INSIDE,
+	SLIDER_MIDDLE, SLIDER_LEFT, SLIDER_RIGHT, SLIDER_INSIDE,
+	CIRCLE_LEFT, CIRCLE_RIGHT, CIRCLE_LEFT_INSIDE, CIRCLE_RIGHT_INSIDE, CIRCLE_LEFT_SPOT, CIRCLE_RIGHT_SPOT,
+	THUMB, THUMB_INSIDE,
+	DROP_LEFT, DROP_RIGHT, DROP_LEFT_INSIDE, DROP_RIGHT_INSIDE,
+	TOP_BOTTOM, TOP_BOTTOM_INSIDE,
+	STEP_RIGHT, STEP_LEFT, STEP_RIGHT_INSIDE, STEP_LEFT_INSIDE,
+};
+
+// Inline shaders
+
+static char frag[] =
+"#version 150\n"
+"out vec4 outColor;"
+"in vec2 texCoord;"
+"uniform sampler2D tex;"
+"uniform float red,green,blue;"
+"void main(void)"
+"{"
+"	vec4 pixel = texture(tex, texCoord);"
+"	outColor = pixel * vec4(red, green, blue, 1.0);"
+"}";
+
+static char vert[]=
+"#version 150\n"
+"in  vec3 inPosition;"
+"out vec2 texCoord;"
+"uniform int x, y, c;"
+"uniform int screenSizeX, screenSizeY;"
+"uniform int offsx, offsy;"
+"uniform float charWidth, charHeight;"
+"uniform int texWidth, texHeight;"
+"void main(void)"
+"{"
+"	int row = c / 16;"
+"	int col = c & 15;"
+"	texCoord = vec2((col + inPosition.x)*charWidth/texWidth, (row + (1.0 - inPosition.y))*charHeight/texWidth);"
+"	texCoord = vec2((col + inPosition.x)*charWidth/texWidth, (row + (inPosition.y))*charHeight/texWidth);"
+""
+"	float screenx = (x + offsx + inPosition.x*charWidth)*2.0/screenSizeX - 1.0;"
+"	float screeny = -(y + offsy + inPosition.y*charHeight)*2.0/screenSizeY + 1.0;"
+"	gl_Position = vec4(screenx, screeny, 0.0, 1.0);"
+"}";
+
+static char frag2[] =
+"#version 150\n"
+"out vec4 outColor;"
+"uniform float red,green,blue,alpha;"
+"void main(void)"
+"{"
+"	outColor = vec4(red, green, blue, alpha);"
+"}";
+
+static char vert2[]=
+"#version 150\n"
+"in  vec3 inPosition;"
+"uniform int x, y;"
+"uniform int offsx, offsy;"
+"uniform int screenSizeX, screenSizeY;"
+"uniform float charWidth, charHeight;"
+"uniform int texWidth, texHeight;"
+"void main(void)"
+"{"
+"	float screenx = (x + offsx + inPosition.x*charWidth)*2.0/screenSizeX - 1.0;"
+"	float screeny = -(y + offsy + inPosition.y*charHeight)*2.0/screenSizeY + 1.0;"
+"	gl_Position = vec4(screenx, screeny, 0.0, 1.0);"
+"}";
+
+static GLuint compile_shaders_GUI(const char *vs, const char *fs) {
+	GLuint v = glCreateShader(GL_VERTEX_SHADER);
+	GLuint f = glCreateShader(GL_FRAGMENT_SHADER);
+
+	glShaderSource(v, 1, &vs, NULL);
+	glShaderSource(f, 1, &fs, NULL);
+	
+    glCompileShader(v);
+	glCompileShader(f);
+	
+    GLuint p = glCreateProgram();
+    glAttachShader(p,v);
+	glAttachShader(p,f);
+	glLinkProgram(p);
+	glUseProgram(p);
+	
+    return p;
+}
+
+static GLfloat VERTICES[] = {	
+	0.0f, 0.0f, 0.0f,
+	0.0f, 1.0f, 0.0f,
+	1.0f, 0.0f, 0.0f,
+	0.0f, 1.0f, 0.0f,
+	1.0f, 1.0f, 0.0f,
+	1.0f, 0.0f, 0.0f
+};
+
+static unsigned int VAO_ID;
+
+static GLuint BOX_PROGRAM;
+static GLuint PROGRAM = -1;
+
+static void init_VAO() {
+	unsigned int vertexBufferObjID;
+
+	BOX_PROGRAM = compile_shaders_GUI(vert2, frag2);
+	PROGRAM = compile_shaders_GUI(vert, frag);
+
+	glUseProgram(PROGRAM);
+	glUniform1i(glGetUniformLocation(PROGRAM, "tex"), 0);
+
+	glGenVertexArrays(1, &VAO_ID);
+	glBindVertexArray(VAO_ID);
+	glGenBuffers(1, &vertexBufferObjID);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
+	glBufferData(GL_ARRAY_BUFFER, 18*sizeof(GLfloat), VERTICES, GL_STATIC_DRAW);
+	glVertexAttribPointer(glGetAttribLocation(PROGRAM, "inPosition"), 3, GL_FLOAT, GL_FALSE, 0, 0); 
+	glEnableVertexAttribArray(glGetAttribLocation(PROGRAM, "inPosition"));
+
+	glUniform1i(glGetUniformLocation(PROGRAM, "tex"), 0);
+
+	glUseProgram(BOX_PROGRAM);
+	glVertexAttribPointer(glGetAttribLocation(BOX_PROGRAM, "inPosition"), 3, GL_FLOAT, GL_FALSE, 0, 0); 
+	glEnableVertexAttribArray(glGetAttribLocation(BOX_PROGRAM, "inPosition"));
+}
+
+static void char_to_texture(unsigned char *in, int c, unsigned char *data) {
+	int start = (128 * ((c - 32) / 16) * 16 + (c & 15) * 8) * 4;
+	int pos, row, bit;
+	for(int i = 0; i < 16; i++) {
+		pos = start + 128 * (15 - i) * 4;
+		row = in[i];
+		for(bit = 128; bit != 0; bit = bit >> 1) {
+			if((row & bit) == 0) {
+				data[pos++] = 0;
+				data[pos++] = 0;
+				data[pos++] = 0;
+				data[pos++] = 0;
+			}
+			else {
+				data[pos++] = 255;
+				data[pos++] = 255;
+				data[pos++] = 255;
+				data[pos++] = 255;
+			}
+		}
+	}
+}
+
+typedef struct FontData {
+	float charH;
+	float charW;
+	int texH;
+	int texW;
+	int space;
+	GLuint texID;
+	float R, G, B;
+
+} FontData, *FontDataPtr;
+
+static FontData FONT;
+
+static int INITIALIZED = 0;
+
+void glUtilitiesLoadFont(unsigned char *data, float charW, float charH, int imgW, int imgH, int space) {
+    GLint tex;
+	GLuint fontTex;
+	GLint prog;
+
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+	
+	init_VAO();
+	
+	glGenTextures(1, &fontTex);
+	glBindTexture(GL_TEXTURE_2D, fontTex);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgW, imgH, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+	FONT.charH = charH;
+	FONT.charW = charW;
+	FONT.texH = imgH;
+	FONT.texW = imgW;
+	FONT.space = space;
+	FONT.texID = fontTex;
+	FONT.R = 1;
+	FONT.G = 1;
+	FONT.B = 1;
+
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glUseProgram(prog);
+}
+
+static void font_to_texture() {
+    GLint i, j, tex;
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex);
+	unsigned char *data = (unsigned char *)malloc(128 * 128 * 4); // 128x128 pixels, 4 bytes each
+	
+	for (i = 0, j = 'A'; i < 26; i++, j++) {
+		char_to_texture(UPPERCASE[i], j, data);
+    }
+
+	for (i = 0,j = 'a'; i < 26; i++, j++) {
+		char_to_texture(LOWERCASE[i], j, data);
+    }
+
+	for (i = 0,j = '0'; i < 16; i++, j++) {
+		char_to_texture(NUMLET[i], j, data);
+    }
+
+	for (i = 0,j = ' '; i < 16; i++, j++) {
+		char_to_texture(SPECIAL[i], j, data);
+    }
+
+	for (i = 0,j = 128; i < STEP_LEFT_INSIDE - SMALL_BOX + 1; i++, j++) {
+		char_to_texture(GUI_SHAPES[i], j, data);
+    }
+
+	glUtilitiesLoadFont(data, 8, 16, 128, 128, 2);
+	glBindTexture(GL_TEXTURE_2D, tex);
+}
+
+enum {
+	K_BOX = 1, 
+    K_STRING, K_SLIDER, K_COLOR, K_CHECKBOX,
+	K_DISPLAY_INT, K_DISPLAY_FLOAT, K_RADIO_ITEM, K_DYNAMIC_STRING,
+	K_COLOR_CLICKER, K_SMALL_COLOR_CLICKER, K_BUTTON, K_MENU_ITEM, K_MENU,
+	K_RIGHT_STEPPER, K_LEFT_STEPPER
+};
+
+typedef struct GUI_Item
+{
+	int type;
+	int state;
+	int iData;
+	float sliderMin, sliderMax;
+    float r, g, b;
+	char *s;
+	int x, y;
+	int hx, hy, hw, hh; // hot box
+	void *var1,*var2,*var3;
+} GUI_Item;
+
+static GUI_Item **ITEMS = NULL;
+static int ITEM_COUNT = 0;
+
+static float FRAME_RED = 1.0;
+static float FRAME_GREEN = 1.0;
+static float FRAME_BLUE = 1.0;
+
+static float FILL_RED = 0.5;
+static float FILL_GREEN = 0.5;
+static float FILL_BLUE = 0.5;
+
+static float SLIDER_FILL_RED = 0.7;
+static float SLIDER_FILL_GREEN = 0.7;
+static float SLIDER_FILL_BLUE = 0.7;
+
+static float BG_RED = 1.0;
+static float BG_GREEN = 1.0;
+static float BG_BLUE = 1.0;
+static float BG_ALPHA = 0.3;
+
+static float TEXT_RED = 1.0;
+static float TEXT_GREEN = 1.0;
+static float TEXT_BLUE = 1.0;
+
+static int BG_BORDER = 5;
+static int SPACING = 20;
+
+static void draw_char(int x, int y, unsigned char c) {
+	glUniform1i(glGetUniformLocation(PROGRAM, "x"), x);
+	glUniform1i(glGetUniformLocation(PROGRAM, "y"), y);
+	glUniform1i(glGetUniformLocation(PROGRAM, "c"), c - 32);
+	glUniform1f(glGetUniformLocation(PROGRAM, "charWidth"), FONT.charW);
+	glUniform1f(glGetUniformLocation(PROGRAM, "charHeight"), FONT.charH);
+	
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+static void set_color(float r, float g, float b) {
+	glUniform1f(glGetUniformLocation(PROGRAM, "red"), r);
+	glUniform1f(glGetUniformLocation(PROGRAM, "green"), g);
+	glUniform1f(glGetUniformLocation(PROGRAM, "blue"), b);
+}
+
+static void draw_char_and_back(int h, int v, unsigned char frame, unsigned char contents, float fr, float fg, float fb, float cr, float cg, float cb) {
+	set_color(cr, cg, cb);
+	draw_char(h, v - FONT.charH, contents);
+	
+    if (frame != 0) {
+		set_color(fr, fg, fb);
+		draw_char(h, v - FONT.charH, frame);
+	}
+}
+
+static int X_MIN = 10000;
+static int Y_MIN = 10000;
+
+static int X_MAX = -10000;
+static int Y_MAX = -10000;
+
+static int OFFS_X = 0;
+static int OFFS_Y = 0;
+
+static int SCALE = 1;
+
+static void draw_string(int h, int v, char *s) {
+	glUniform1f(glGetUniformLocation(PROGRAM, "red"), TEXT_RED);
+	glUniform1f(glGetUniformLocation(PROGRAM, "green"), TEXT_GREEN);
+	glUniform1f(glGetUniformLocation(PROGRAM, "blue"), TEXT_BLUE);
+
+	for (; *s != 0; s++) {
+		draw_char(h, v - FONT.charH, *s);
+		h += FONT.charW + FONT.space;
+	}
+}
+
+static void draw_text(int h, int v, char *s, int spacing) {
+	int p = 0;
+	int count = 0;
+	for (int i = 0; s[i] != 0; i++) {
+		if ((s[i + 1] == 10) || (s[i + 1] == 13) || s[i + 1] == 0) {
+			char tmp[1024];
+			if (i - p > 1023) {
+				i = p - 1023;
+            }
+
+			int j;
+			for (j = p; j <= i; j++) {
+				tmp[j - p] = s[j];
+            }
+
+			tmp[j - p] = 0;
+			draw_string(h, v + spacing * count, tmp);
+			count++;
+			
+			if ((s[i + 1] == 10) || (s[i + 1] == 13)) {
+				if (s[i] != s[i + 1]) {
+					i++;
+                }
+            }
+			p = i + 1;
+		}
+	}
+}
+
+static void get_text_dimensions(char *s, int *w, int *h) {
+	int p = 0;
+	int max = 0;
+	int count = 0;
+	for (int i = 0; s[i] != 0; i++) {
+		if ((s[i + 1] == 10) || (s[i + 1] == 13) || s[i + 1] == 0) {
+			if (max < i - p) {
+                max = i - p;
+            }
+			count++;
+			
+			if ((s[i + 1] == 10) || (s[i + 1] == 13)) {
+				if (s[i] != s[i + 1]) {
+					i++;
+                }
+            }
+			p = i + 1;
+		}
+	}
+	
+	*w = max;
+	*h = count - 1;
+}
+
+void glUtilitiesDrawGUI() {
+    GLint tex, texUnit;
+	GLint prog;
+		
+	char saveZ = glIsEnabled(GL_DEPTH_TEST);
+	char saveCull = glIsEnabled(GL_CULL_FACE);
+	char saveBlend = glIsEnabled(GL_BLEND);
+
+	GLint srcAlpha, dstAlpha;
+	glGetIntegerv(GL_BLEND_SRC_ALPHA, &srcAlpha);
+	glGetIntegerv(GL_BLEND_DST_ALPHA, &dstAlpha);
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &texUnit);
+	glActiveTexture(GL_TEXTURE0);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+
+	GLint a[4];
+	glGetIntegerv(GL_VIEWPORT, a);
+    
+	int RASTER_H = a[2] / SCALE;
+	int RASTER_V = a[3] / SCALE;
+
+	if(!INITIALIZED) {
+		init_VAO();
+		font_to_texture();
+		INITIALIZED = 1;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, FONT.texID);
+
+	glUseProgram(BOX_PROGRAM);
+
+	if (BG_ALPHA > 0.01) {
+		int w, h;
+
+		X_MIN = 10000;
+		Y_MIN = 10000;
+        X_MAX = -10000;
+		Y_MAX = -10000;
+		if(ITEMS) {
+            for(int i = 0; ITEMS[i] != NULL; i++) {
+                if(ITEMS[i]->type != -1) {
+                    int x;
+                    if (ITEMS[i]->x < X_MIN) {
+                        X_MIN = ITEMS[i]->x;
+                    }
+
+                    if (ITEMS[i]->y - 16 < Y_MIN) {
+                        Y_MIN = ITEMS[i]->y - 16;
+                    }
+
+                    if (ITEMS[i]->y > Y_MAX) {
+                        Y_MAX = ITEMS[i]->y;
+                    }
+
+                    char iStr[1024];
+                    char fStr[1024];
+                    switch (ITEMS[i]->type) {
+                        case K_SLIDER:
+                            x = ITEMS[i]->x + 16 + ITEMS[i]->state * 8; 
+                            break;
+                        case K_BOX:
+                        case K_COLOR_CLICKER:
+                        case K_SMALL_COLOR_CLICKER:
+                        case K_BUTTON:
+                        case K_MENU_ITEM:
+                        case K_MENU:
+                        case K_RIGHT_STEPPER:
+                        case K_LEFT_STEPPER:
+                            x = ITEMS[i]->x + ITEMS[i]->hw; 
+                            break;
+                        case K_CHECKBOX:
+                        case K_RADIO_ITEM:
+                            x = ITEMS[i]->x + 16 + 15 + strlen(ITEMS[i]->s) * 8; 
+                            break;
+                        case K_STRING:
+                        case K_DYNAMIC_STRING:
+                            get_text_dimensions(ITEMS[i]->s, &w, &h);
+                            x = ITEMS[i]->x + w * (FONT.charW + FONT.space) + 6;
+                            if (ITEMS[i]->y + h * SPACING > Y_MAX) {
+                                Y_MAX = ITEMS[i]->y + h * SPACING;
+                            }
+                            break;
+                        case K_DISPLAY_INT:
+                            sprintf(iStr, "%d", *((int *)ITEMS[i]->var1));
+                            x = ITEMS[i]->x + (strlen(ITEMS[i]->s) + 2 + strlen(iStr)) * (FONT.charW + FONT.space);
+                            break;
+                        case K_DISPLAY_FLOAT:
+                            sprintf(fStr, "%g", *((float *)ITEMS[i]->var1));
+                            x = ITEMS[i]->x + (strlen(ITEMS[i]->s) + 2 + strlen(fStr)) * (FONT.charW + FONT.space);
+                            break;
+                    }
+
+                    if (x > X_MAX) {
+                        X_MAX = x;
+                    } 
+                }
+            }
+        }
+		
+		glUseProgram(BOX_PROGRAM);
+		glBindVertexArray(VAO_ID);
+
+		glUniform1i(glGetUniformLocation(BOX_PROGRAM, "offsx"), OFFS_X);
+		glUniform1i(glGetUniformLocation(BOX_PROGRAM, "offsy"), OFFS_Y);
+
+		glUniform1i(glGetUniformLocation(BOX_PROGRAM, "screenSizeX"), RASTER_H);
+		glUniform1i(glGetUniformLocation(BOX_PROGRAM, "screenSizeY"), RASTER_V);
+		glUniform1i(glGetUniformLocation(BOX_PROGRAM, "x"), X_MIN - BG_BORDER);
+		glUniform1i(glGetUniformLocation(BOX_PROGRAM, "y"), Y_MIN - BG_BORDER);
+		glUniform1f(glGetUniformLocation(BOX_PROGRAM, "charWidth"), X_MAX - X_MIN + BG_BORDER * 2);
+		glUniform1f(glGetUniformLocation(BOX_PROGRAM, "charHeight"), Y_MAX - Y_MIN + BG_BORDER * 2);
+		glUniform1f(glGetUniformLocation(BOX_PROGRAM, "red"), BG_RED);
+		glUniform1f(glGetUniformLocation(BOX_PROGRAM, "green"), BG_GREEN);
+		glUniform1f(glGetUniformLocation(BOX_PROGRAM, "blue"), BG_BLUE);
+		glUniform1f(glGetUniformLocation(BOX_PROGRAM, "alpha"), BG_ALPHA);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+
+	glUseProgram(PROGRAM);
+	glBindVertexArray(VAO_ID);
+
+	glUniform1i(glGetUniformLocation(PROGRAM, "screenSizeX"), RASTER_H);
+	glUniform1i(glGetUniformLocation(PROGRAM, "screenSizeY"), RASTER_V);
+	glUniform1f(glGetUniformLocation(PROGRAM, "charWidth"), FONT.charW);
+	glUniform1f(glGetUniformLocation(PROGRAM, "charHeight"), FONT.charH);
+	glUniform1i(glGetUniformLocation(PROGRAM, "texWidth"), FONT.texW);
+	glUniform1i(glGetUniformLocation(PROGRAM, "texHeight"), FONT.texH);
+	glUniform1i(glGetUniformLocation(PROGRAM, "offsx"), OFFS_X);
+	glUniform1i(glGetUniformLocation(PROGRAM, "offsy"), OFFS_Y);	
+
+	if(ITEMS) {
+        for(int i = 0; ITEMS[i] != NULL; i++) {
+            int h = ITEMS[i]->x;
+            int v = ITEMS[i]->y;
+
+            switch (ITEMS[i]->type) {
+            case K_SLIDER: {
+                int lefth = h;
+
+                draw_char_and_back(h, v, SLIDER_LEFT, SLIDER_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, ITEMS[i]->r, ITEMS[i]->g, ITEMS[i]->b);
+                h += FONT.charW;
+                for(int c = 0; c < ITEMS[i]->state; c++) {
+                    draw_char_and_back(h, v, SLIDER_MIDDLE, SLIDER_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, ITEMS[i]->r, ITEMS[i]->g, ITEMS[i]->b);
+                    h += FONT.charW;
+                }
+                draw_char_and_back(h, v, SLIDER_RIGHT, SLIDER_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, ITEMS[i]->r, ITEMS[i]->g, ITEMS[i]->b);
+
+                if (ITEMS[i]->var1) {
+                    float var1s = (*((float *)ITEMS[i]->var1) - ITEMS[i]->sliderMin) / (ITEMS[i]->sliderMax - ITEMS[i]->sliderMin);
+                    if (var1s < 0) {
+                        var1s = 0;
+                    }                    
+                    
+                    if (var1s > 1) {
+                        var1s = 1;
+                    }
+                    ITEMS[i]->iData = var1s * (ITEMS[i]->hw - 8);
+                }
+                h = lefth + ITEMS[i]->iData;
+                draw_char_and_back(h, v, THUMB, THUMB_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                break;
+            }
+
+            case K_BOX: {
+                float r = 0.5;
+                float g = 0.5;
+                float b = 0.5;
+                
+                if (ITEMS[i]->var1) {
+                    r = *((float *)ITEMS[i]->var1);
+                }
+
+                if (ITEMS[i]->var2) {
+                    g = *((float *)ITEMS[i]->var2);
+                }
+
+                if (ITEMS[i]->var3) {
+                    b = *((float *)ITEMS[i]->var3);
+                }
+                
+                if (ITEMS[i]->state == 1) {
+                    draw_char_and_back(h, v, DROP_LEFT, DROP_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, r, g, b);
+                    h += FONT.charW;
+                    draw_char_and_back(h, v, DROP_RIGHT, DROP_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, r, g, b);
+                }
+                else {
+                    draw_char_and_back(h, v, BIG_BOX_LEFT, BIG_BOX_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, r, g, b);
+                    h += FONT.charW;
+                    draw_char_and_back(h, v, BIG_BOX_RIGHT, BIG_BOX_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, r, g, b);
+                }
+                break;
+            }
+            
+            case K_COLOR_CLICKER: {
+                draw_char_and_back(h, v, 0, BIG_BOX_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, ITEMS[i]->r, ITEMS[i]->g, ITEMS[i]->b);
+                h += FONT.charW;
+                draw_char_and_back(h, v, 0, BIG_BOX_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, ITEMS[i]->r, ITEMS[i]->g, ITEMS[i]->b);
+                break;
+            }
+            
+            case K_SMALL_COLOR_CLICKER: {
+                draw_char_and_back(h, v, 0, SMALL_BOX, FRAME_RED, FRAME_GREEN, FRAME_BLUE, ITEMS[i]->r, ITEMS[i]->g, ITEMS[i]->b);
+                break;
+            }
+            
+            case K_CHECKBOX: {
+                int state;
+                if (ITEMS[i]->var1) {
+                    state = *((int *)ITEMS[i]->var1);
+                }
+                else {
+                    state = ITEMS[i]->state;
+                }
+                
+                if (state != 0) {
+                    draw_char_and_back(h, v, BIG_BOX_LEFT_CHECKED, BIG_BOX_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                    h += FONT.charW;
+                    draw_char_and_back(h, v, BIG_BOX_RIGHT_CHECKED, BIG_BOX_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                }
+                else
+                {
+                    draw_char_and_back(h, v, BIG_BOX_LEFT, BIG_BOX_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                    h += FONT.charW;
+                    draw_char_and_back(h, v, BIG_BOX_RIGHT, BIG_BOX_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                }
+
+                h += 15;
+                v += 3;
+
+                draw_string(h, v, ITEMS[i]->s);
+                break;
+            }
+
+            case K_RADIO_ITEM: {
+                int saveh = h;
+                int state;
+                if (ITEMS[i]->var1) {
+                    state = *((int *)ITEMS[i]->var1);
+                }
+                else
+                    state = ITEMS[i]->state;
+                
+                draw_char_and_back(h, v, CIRCLE_LEFT, CIRCLE_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                h += FONT.charW;
+                draw_char_and_back(h, v, CIRCLE_RIGHT, CIRCLE_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+
+                if (state == ITEMS[i]->iData) {
+                    h = saveh;
+
+                    set_color(FONT.R, FONT.G, FONT.B);
+                    draw_char(h, v - FONT.charH, CIRCLE_LEFT_SPOT);
+                    h += FONT.charW;
+                    draw_char(h, v - FONT.charH, CIRCLE_RIGHT_SPOT);
+                }
+
+                h += 15;
+                v += 3;
+
+                draw_string(h, v, ITEMS[i]->s);
+                break;
+            }
+
+            case K_RIGHT_STEPPER:
+                if (ITEMS[i]->state == 0) {
+                    draw_char_and_back(h, v, STEP_RIGHT, STEP_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                }
+                else {
+                    draw_char_and_back(h, v, STEP_RIGHT, STEP_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, fmod(FILL_RED + 0.5, 1), fmod(FILL_GREEN + 0.5, 1), fmod(FILL_BLUE + 0.5, 1));
+                }
+                break;
+
+            case K_LEFT_STEPPER:
+                if (ITEMS[i]->state == 0) {
+                    draw_char_and_back(h, v, STEP_LEFT, STEP_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                }
+                else {
+                    draw_char_and_back(h, v, STEP_LEFT, STEP_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, fmod(FILL_RED + 0.5, 1), fmod(FILL_GREEN + 0.5, 1), fmod(FILL_BLUE + 0.5, 1));
+                }
+                break;
+
+            case K_BUTTON: {
+                int saveh = h;
+
+                int size;
+                if (ITEMS[i]->s) {
+                    size = strlen(ITEMS[i]->s) * 10 / 8;
+                }
+                else {
+                    size = 1;
+                }
+                
+                #define cmod 0.8
+                if (ITEMS[i]->state == 0) {
+                    draw_char_and_back(h, v, CIRCLE_LEFT, CIRCLE_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, fmod(FRAME_RED + cmod, 1), fmod(FRAME_GREEN + cmod, 1), fmod(FRAME_BLUE + cmod, 1));
+                    h += FONT.charW;
+                    for (int i = 0; i < size; i++)
+                    {
+                        draw_char_and_back(h, v, TOP_BOTTOM, TOP_BOTTOM_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, fmod(FRAME_RED + cmod, 1), fmod(FRAME_GREEN + cmod, 1), fmod(FRAME_BLUE + cmod, 1));
+                        h += FONT.charW;
+                    }
+                    draw_char_and_back(h, v, CIRCLE_RIGHT, CIRCLE_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, fmod(FRAME_RED + cmod, 1), fmod(FRAME_GREEN + cmod, 1), fmod(FRAME_BLUE + cmod, 1));
+                }
+                else {
+                    draw_char_and_back(h, v, CIRCLE_LEFT, CIRCLE_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                    h += FONT.charW;
+                    for (int i = 0; i < size; i++) {
+                        draw_char_and_back(h, v, TOP_BOTTOM, TOP_BOTTOM_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                        h += FONT.charW;
+                    }
+                    draw_char_and_back(h, v, CIRCLE_RIGHT, CIRCLE_RIGHT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                }
+
+                h = saveh + 8;
+                v += 3;
+                if (ITEMS[i]->state == 0) {
+                    glUniform1f(glGetUniformLocation(PROGRAM, "red"), TEXT_RED);
+                    glUniform1f(glGetUniformLocation(PROGRAM, "green"), TEXT_GREEN);
+                    glUniform1f(glGetUniformLocation(PROGRAM, "blue"), TEXT_BLUE);
+                }
+                else {
+                    glUniform1f(glGetUniformLocation(PROGRAM, "red"), 1 - TEXT_RED);
+                    glUniform1f(glGetUniformLocation(PROGRAM, "green"), 1 - TEXT_GREEN);
+                    glUniform1f(glGetUniformLocation(PROGRAM, "blue"), 1 - TEXT_BLUE);
+                }
+
+                char *s = ITEMS[i]->s;
+                for (; *s != 0; s++) {
+                    draw_char(h, v - FONT.charH, *s);
+                    h += FONT.charW + FONT.space;
+                }
+                break;
+            }
+
+            case K_MENU: {
+                int saveh = h;
+                int size = ITEMS[i]->iData * 10 / 8;
+                
+                set_color(FONT.R, FONT.G, FONT.B);
+
+                for (int i = 0; i < size + 2; i++) {
+                    draw_char(h, v - 16, BIG_BOX_LEFT_INSIDE);
+                    h += FONT.charW;
+                }
+
+                h = saveh + 8;
+                v += 3;
+                
+                set_color(1 - TEXT_RED, 1 - TEXT_GREEN, 1 - TEXT_BLUE);
+                
+                char *s = ITEMS[i]->s;
+                for (; *s != 0; s++) {
+                    draw_char(h, v - FONT.charH, *s);
+                    h += FONT.charW + FONT.space;
+                }
+                break;
+            }
+
+            case K_STRING:
+            case K_DYNAMIC_STRING: {
+                draw_text(h, v, ITEMS[i]->s, SPACING);
+                break;
+            }
+            
+            case K_DISPLAY_INT: {
+                draw_string(h, v, ITEMS[i]->s);
+                h += strlen(ITEMS[i]->s) * 10;
+                
+                if (ITEMS[i]->var1) {
+                    char iStr[1024];
+                    sprintf(iStr, "%d", *((int *)ITEMS[i]->var1));
+                    draw_string(h, v, iStr);
+                }
+                break;
+            }
+            
+            case K_DISPLAY_FLOAT: {
+                draw_string(h, v, ITEMS[i]->s);
+                h += strlen(ITEMS[i]->s) * 10;
+
+                if (ITEMS[i]->var1) {
+                    char fStr[1024];
+                    sprintf(fStr, "%g", *((float *)ITEMS[i]->var1));
+                    draw_string(h, v, fStr);
+                }
+                break;
+            }
+            }
+        }
+    }
+	
+	if (ITEMS) {
+        for (int i = 0; ITEMS[i] != NULL; i++) {
+            int h = ITEMS[i]->x;
+            int v = ITEMS[i]->y;
+            
+            if (ITEMS[i]->type == K_MENU_ITEM) {
+                if (ITEMS[i]->state != 0) {
+                    int saveh = h;
+                    int size;
+
+                    if (ITEMS[i]->s) {
+                        size = ITEMS[i]->iData * 10 / 8;
+                    }
+                    else {
+                        size = 1;
+                    }
+
+                    for (int ii = 0; ii < size + 2; ii++) {
+                        draw_char_and_back(h, v, 0, BIG_BOX_LEFT_INSIDE, FRAME_RED, FRAME_GREEN, FRAME_BLUE, FILL_RED, FILL_GREEN, FILL_BLUE);
+                        h += FONT.charW;
+                    }
+
+                    h = saveh + 8;
+                    v += 3;
+
+                    glUniform1f(glGetUniformLocation(PROGRAM, "red"), TEXT_RED);
+                    glUniform1f(glGetUniformLocation(PROGRAM, "green"), TEXT_GREEN);
+                    glUniform1f(glGetUniformLocation(PROGRAM, "blue"), TEXT_BLUE);
+                    
+                    char *s = ITEMS[i]->s;
+                    for (; *s != 0; s++) {
+                        draw_char(h, v - FONT.charH, *s);
+                        h += FONT.charW + FONT.space;
+                    }
+                }
+            }
+        }
+    }
+	
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glActiveTexture(texUnit);
+	glUseProgram(prog);
+	
+    if (saveZ) {
+        glEnable(GL_DEPTH_TEST);
+    }
+
+	if (saveCull) {
+        glEnable(GL_CULL_FACE);
+    }
+
+	if (!saveBlend) {
+        glDisable(GL_BLEND);
+    }
+
+	glBlendFunc(srcAlpha, dstAlpha);
+	glBindVertexArray(0);
+}
+
+static int hit_box(GUI_Item *item, int x, int y) {
+    if (x >= item->hx && y >= item->hy-item->hh && x <= item->hx+item->hw && y <= item->hy) {
+		if (item->var1) {
+			*((int *)item->var1) = 1 - *((int *)item->var1);
+			item->state = *((int *)item->var1);
+		}
+		else {
+			item->state = 1 - item->state;
+        }
+		return 1;
+	}
+	return 0;
+}
+
+static int hit_color_clicker(GUI_Item *item, int x, int y) {
+	if (x >= item->hx && y >= item->hy-item->hh && x <= item->hx+item->hw && y <= item->hy) {
+		if (item->var1) {
+			*((float *)item->var1) = item->r;
+        }
+
+		if (item->var2) {
+			*((float *)item->var2) = item->g;
+        }
+
+		if (item->var3) {
+			*((float *)item->var3) = item->b;
+        }
+
+		return 1;
+	}
+	return 0;
+}
+
+static int hit_radio(GUI_Item *item, int x, int y) {
+	if (x > item->hx && y > item->hy-item->hh && x < item->hx+item->hw && y < item->hy) {
+		if (item->var1) {
+			*((int *)item->var1) = item->iData;
+			item->state = *((int *)item->var1);
+		}
+		else {
+			item->state = item->iData;
+        }
+		return 1;
+	}
+	return 0;
+}
+
+static int hit_button(GUI_Item *item, int x, int y) {
+	if (x > item->hx && y > item->hy-item->hh && x < item->hx+item->hw && y < item->hy) {
+		return 1;
+	}
+	return 0;
+}
+
+static int hit_slider(GUI_Item *item, int x, int y) {
+	if (x >= item->hx && y > item->hy-item->hh && x <= item->hx+item->hw && y < item->hy) {
+		item->iData = x - item->hx;
+		if (item->iData < 0) {
+            item->iData = 0;
+        }
+
+		if (item->iData > (item->hw - 4)) {
+            item->iData = (item->hw - 8);
+        }
+		
+		if (item->var1) {
+			*((float *)item->var1) = 1.0 * item->iData / (item->hw - 8);
+			*((float *)item->var1) *= (item->sliderMax - item->sliderMin);
+			*((float *)item->var1) += item->sliderMin;
+		}
+
+		return 1;
+	}
+	return 0;
+}
+
+static int LAST_X_LOC = 0;
+static int LAST_Y_LOC = 0;
+
+static int glUtilitiesCreateItem(int x, int y) {
+    if (x < 0) {
+        x = LAST_X_LOC;
+    }
+    
+	if (y < 0) {
+        y = LAST_Y_LOC + SPACING;
+    }
+
+	LAST_X_LOC = x;
+	LAST_Y_LOC = y;
+	
+	if (!ITEMS) {
+		ITEMS = (GUI_Item **)malloc(sizeof(GUI_Item *) * 2);
+		ITEMS[0] = (GUI_Item *)malloc(sizeof(GUI_Item));
+		ITEMS[1] = NULL;
+		ITEM_COUNT++;
+	}
+	else {
+		for (int i = 0; i < ITEM_COUNT; i++) {
+			if (ITEMS[i]->type == -1) {
+				return i;
+            }
+        }
+		
+		ITEMS = (GUI_Item **)realloc(ITEMS, sizeof(GUI_Item *) * (ITEM_COUNT + 2));
+		ITEMS[ITEM_COUNT] = (GUI_Item *)malloc(sizeof(GUI_Item));
+		ITEMS[ITEM_COUNT + 1] = NULL;
+		ITEM_COUNT++;
+	}
+
+	ITEMS[ITEM_COUNT - 1]->x = x;
+	ITEMS[ITEM_COUNT - 1]->y = y;
+	ITEMS[ITEM_COUNT - 1]->hx = x;
+	ITEMS[ITEM_COUNT - 1]->hy = y;
+
+	return ITEM_COUNT - 1;
+}
+
+// TODO: Implement rest of the declared functions

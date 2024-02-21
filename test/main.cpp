@@ -10,7 +10,7 @@
 
 void uploadMessage(const std::string& username, const std::string& message, float x, float y, float z) {
     try {
-        pqxx::connection C("dbname=emmesen user=postgres password= hostaddr=127.0.0.1 port=5432");
+        pqxx::connection C("dbname=emmesen user=postgres password=verysecurehaha hostaddr=127.0.0.1 port=5432");
         if (C.is_open()) {
             std::cout << "Opened database successfully: " << C.dbname() << std::endl;
         } else {
@@ -40,7 +40,7 @@ void fetchAllMessages() {
     // TODO: fetch amount of messages and store in variable (in this case the 6)
 	msgPosArr = (Vector3 *)malloc(sizeof(GLfloat) * 3 * 6);
     try {
-        pqxx::connection C("dbname=emmesen user=postgres password= hostaddr=127.0.0.1 port=5432");
+        pqxx::connection C("dbname=emmesen user=postgres password=verysecurehaha hostaddr=127.0.0.1 port=5432");
         if (C.is_open()) {
             std::cout << "Opened database successfully: " << C.dbname() << std::endl;
         } else {
@@ -194,7 +194,7 @@ void initf(void) {
 
 	glUtilitiesReportError("TERRAIN INIT");
 
-	msg = glUtilitiesLoadModel("test/res/star.obj");
+	msg = glUtilitiesLoadModel("test/res/bubble.obj");
 }
 
 Vector2 camRot = Vector2(0, 0);
@@ -332,7 +332,7 @@ void displayf(void) {
 	glBindTexture(GL_TEXTURE_2D, tex2);
     for (int i = 0; i < 6; i++) {
         Matrix4 modelView2 = Transform(msgPosArr[i].x, msgPosArr[i].y, msgPosArr[i].z);
-        modelView2 = MultM4(modelView2, RotateX(M_PI/2));
+        //modelView2 = MultM4(modelView2, RotateX(M_PI/2));
         glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, modelView2.m);
 	    glUtilitiesDrawModel(msg, program, "inPosition", "inNormal", "inTexCoord");
     }
